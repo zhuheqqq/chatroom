@@ -13,7 +13,7 @@ public:
     TcpSocket(int fd);
     ~TcpSocket();
     int SendMsg(string msg);
-    int RecvMsg();
+    string RecvMsg();
 
     int readn(char * buf,int size);
     int writen(const char *msg,int size);

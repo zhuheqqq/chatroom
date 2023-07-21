@@ -80,11 +80,14 @@ int TcpSocket::SendMsg(string msg)
     return ret;
 }
 
-int TcpSocket::RecvMsg()
+string TcpSocket::RecvMsg()
 {
     //接收数据头
     int len=0;
-    readn((char *)&len,4);
+    int ret=readn((char *)&len,4);
+    if(ret==0){
+        return "close";
+    }
     len=ntohl(len);
 
     char *buf=new char[len+1];
@@ -92,15 +95,15 @@ int TcpSocket::RecvMsg()
     int ret=readn(buf,len);
     if(ret!=len)
     {
-        return -1;//-1代表数据接收失败
+        return "resverr";//-1代表数据接收失败
     }else if(ret==0)
     {
         close(fd);
-        return -2;//-2代表对方断开连接
+        return "disconnect";//-2代表对方断开连接
     }
 
     buf[len]='\0';
     string msg(buf);
 
-    return ret;//返回接收到的字节数
+    return msg;//返回接收到的字节数
 }
