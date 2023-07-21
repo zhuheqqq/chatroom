@@ -3,9 +3,11 @@
 #include<unistd.h>
 #include<sys/types.h>
 #include<string.h>
+#include<cctype>//isdigit的头文件
 #include<cstdlib>
 #include "TcpSocket.cpp"
-#include "UserCommand.hpp";
+#include "UserCommand.hpp"
+#include "func.hpp"
 
 using namespace std;
 
@@ -14,6 +16,7 @@ void Sign_menu();
 int Login();
 int Log_in(TcpSocket socket);
 int Sign_up(TcpSocket socket);
+string get_uid();
 
 
 
@@ -22,6 +25,46 @@ void setup()
 {
     signal(SIGINT,SIG_IGN);//忽略ctrl+c信号
     signal(SIGQUIT,SIG_IGN);//忽略ctrl+d信号
+}
+
+//获取用户的uid
+string get_uid()
+{
+    string uid;
+    int flag=1,c;
+    
+    cout<<"您的帐号为:"<<endl;
+    cin.sync();//清空缓冲区
+    getline(cin,uid);//获取输入的uid
+
+    for(int c:uid)
+    {
+        if(!isdigit(c))
+        {
+            flag=0;
+            break;
+        }
+    }
+
+    while(flag==0)
+    {
+        cout<<"您输入的uid不全为数字,请重新输入:"<<endl;
+        cin.sync();
+        getline(cin,uid);
+
+        flag=1;
+        for(int c:uid)
+        {
+            if(!isdigit(c))
+            {
+                flag=0;
+                break;
+            }
+        }
+    }
+
+    return uid;
+    
 }
 
 //注册登陆界面菜单
@@ -79,7 +122,7 @@ int Login()
     }
 }
 
-int Sign_up(TcpSocket mysocket)
+int Sign_up(TcpSocket mysocket)//注册
 {
     string nickname;//昵称
     string pwd,pwd2;//密码
@@ -108,7 +151,7 @@ int Sign_up(TcpSocket mysocket)
         }
         
     }
-    UserCommand command("NULL",nickname,"让服务器返回一个uid",{pwd});
+    UserCommand command("NULL",nickname,SIGNUP,{pwd});//假设1为让服务器随机生成一个uid
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     if(ret==0||ret==-1)
     {
@@ -122,4 +165,33 @@ int Sign_up(TcpSocket mysocket)
         exit(0);
     }
     cout<<"您注册的uid为:"<<uid<<endl;
+
+    return 0;
 }   
+
+
+int Log_in(TcpSocket mysocket)
+{
+    string uid,password;
+    uid=get_uid();
+
+    cin.sync();
+    cout<<"请输入您的密码:"<<endl;
+    getline(cin,password);
+
+    UserCommand command(uid,"NULL",LOGIN,{password});//LOGIN含义为让服务器端比对密码
+    int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
+    if(ret==0||ret==-1)
+    {
+        cout<<"服务器已关闭"<<endl;
+        exit(0);
+    }
+
+    string resv=mysocket.RecvMsg();//接收返回的结果
+    if(){
+        //接收服务器端返回的字符打印提示信息
+    }
+    
+
+    
+}
