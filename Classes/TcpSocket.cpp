@@ -95,15 +95,15 @@ string TcpSocket::RecvMsg()
     int ret=readn(buf,len);
     if(ret!=len)
     {
-        return "resverr";//-1代表数据接收失败
+        return to_string(len);
     }else if(ret==0)
     {
         close(fd);
-        return "disconnect";//-2代表对方断开连接
+        return "close";
     }
 
     buf[len]='\0';
     string msg(buf);
 
-    return msg;//返回接收到的字节数
+    return msg;
 }
