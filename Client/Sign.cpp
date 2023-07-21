@@ -4,7 +4,17 @@
 #include<sys/types.h>
 #include<string.h>
 #include<cstdlib>
+#include "TcpSocket.cpp"
+#include "UserCommand.hpp";
+
 using namespace std;
+
+void setup();
+void Sign_menu();
+int Login();
+int Log_in(TcpSocket socket);
+int Sign_up(TcpSocket socket);
+
 
 
 //信号处理函数
@@ -17,7 +27,7 @@ void setup()
 //注册登陆界面菜单
 void Sign_menu()
 {
-    cout<<"-----------------------------------------------------------"<<endl;
+    cout<<"---------------------welcom to chatroom--------------------"<<endl;
     cout<<"-                                                         -"<<endl;
     cout<<"-                          1.注册                         -"<<endl;
     cout<<"-                          2.登陆                         -"<<endl;
@@ -26,14 +36,11 @@ void Sign_menu()
     cout<<"-----------------------------------------------------------"<<endl;
 }
 
-int readn(char *buf,int size)
-{
-    int len=
-}
-
 //登陆模块
 int Login()
 {
+    TcpSocket mysocket;
+    
     while(1)
     {
         int choice;
@@ -55,13 +62,15 @@ int Login()
 
         if(choice==1)
         {
-            Sign_up();
+            Sign_up(mysocket);
+
         }else if(choice==2)
         {
-            Log_in();
+            Log_in(mysocket);
+
         }else if(choice==3)
         {
-            exit(1);
+            exit(0);
 
         }else{
             cout<<"输入错误,请重新输入："<<endl;
@@ -69,3 +78,48 @@ int Login()
         }
     }
 }
+
+int Sign_up(TcpSocket mysocket)
+{
+    string nickname;//昵称
+    string pwd,pwd2;//密码
+
+    while(1){
+        cin.sync();//清空缓冲区        
+        cout<<"请输入昵称:"<<endl;
+        getline(cin,nickname);//读入昵称
+
+        cin.sync();//清空缓冲区
+        cout<<"请输入密码:"<<endl;
+        getline(cin,pwd);
+        while(pwd.size()==0){
+            cout<<"请重新输入有效的密码:"<<endl;
+            getline(cin,pwd);
+        }
+
+        cout<<"请确认您的密码:"<<endl;
+        getline(cin,pwd2);
+        if(pwd!=pwd2)
+        {
+            cout<<"两次密码不一致,请重新操作:"<<endl;
+            return -1;
+        }else{
+            break;
+        }
+        
+    }
+    UserCommand command("NULL",nickname,"让服务器返回一个uid",{pwd});
+    int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
+    if(ret==0||ret==-1)
+    {
+        cout<<"服务器已关闭"<<endl;
+        exit(0);
+    }
+
+    string uid=mysocket.RecvMsg();//收到生成的uid
+    if(uid=="close"){
+        cout<<"对端已关闭"<<endl;
+        exit(0);
+    }
+    cout<<"您注册的uid为:"<<uid<<endl;
+}   
