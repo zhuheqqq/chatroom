@@ -5,9 +5,11 @@
 #include<string.h>
 #include<cctype>//isdigit的头文件
 #include<cstdlib>
-#include "TcpSocket.cpp"
-#include "UserCommand.hpp"
-#include "func.hpp"
+#include "../Classes/UserCommand.hpp"
+#include "../Classes/TcpSocket.cpp"
+#include "../Server/func.hpp"
+#include "../Server/wrap.hpp"
+#include "Menu.hpp"
 
 using namespace std;
 
@@ -17,6 +19,7 @@ int Login();
 int Log_in(TcpSocket socket);
 int Sign_up(TcpSocket socket);
 string get_uid();
+void Func_menu();
 
 
 
@@ -33,8 +36,8 @@ string get_uid()
     string uid;
     int flag=1,c;
     
-    cout<<"您的帐号为:"<<endl;
-    cin.sync();//清空缓冲区
+    cout<<"您的uid帐号为:"<<endl;
+    cin.ignore();//清空缓冲区
     getline(cin,uid);//获取输入的uid
 
     for(int c:uid)
@@ -49,7 +52,7 @@ string get_uid()
     while(flag==0)
     {
         cout<<"您输入的uid不全为数字,请重新输入:"<<endl;
-        cin.sync();
+        cin.ignore();
         getline(cin,uid);
 
         flag=1;
@@ -67,17 +70,6 @@ string get_uid()
     
 }
 
-//注册登陆界面菜单
-void Sign_menu()
-{
-    cout<<"---------------------welcom to chatroom--------------------"<<endl;
-    cout<<"-                                                         -"<<endl;
-    cout<<"-                          1.注册                         -"<<endl;
-    cout<<"-                          2.登陆                         -"<<endl;
-    cout<<"-                          3.退出                         -"<<endl;
-    cout<<"-                                                         -"<<endl;
-    cout<<"-----------------------------------------------------------"<<endl;
-}
 
 //登陆模块
 int Login()
@@ -128,13 +120,15 @@ int Sign_up(TcpSocket mysocket)//注册
     string pwd,pwd2;//密码
 
     while(1){
-        cin.sync();//清空缓冲区        
+        cin.ignore();//忽略缓冲区多余字符        
         cout<<"请输入昵称:"<<endl;
         getline(cin,nickname);//读入昵称
-
-        cin.sync();//清空缓冲区
+        
+       // cin.sync();//清空缓冲区,使用这个函数导致nickname无法输入
         cout<<"请输入密码:"<<endl;
         getline(cin,pwd);
+        
+
         while(pwd.size()==0){
             cout<<"请重新输入有效的密码:"<<endl;
             getline(cin,pwd);
@@ -144,7 +138,8 @@ int Sign_up(TcpSocket mysocket)//注册
         getline(cin,pwd2);
         if(pwd!=pwd2)
         {
-            cout<<"两次密码不一致,请重新操作:"<<endl;
+            system("clear");
+            cout<<"两次密码不一致,请重新操作"<<endl;
             return -1;
         }else{
             break;
@@ -170,12 +165,12 @@ int Sign_up(TcpSocket mysocket)//注册
 }   
 
 
-int Log_in(TcpSocket mysocket)
+int Log_in(TcpSocket mysocket)//登陆
 {
     string uid,password;
     uid=get_uid();
 
-    cin.sync();
+    //cin.ignore();
     cout<<"请输入您的密码:"<<endl;
     getline(cin,password);
 
@@ -188,10 +183,37 @@ int Log_in(TcpSocket mysocket)
     }
 
     string resv=mysocket.RecvMsg();//接收返回的结果
-    if(){
-        //接收服务器端返回的字符打印提示信息
-    }
-    
+    if(resv=="close")//接收服务器端返回的字符打印提示信息
+    {
+        cout<<"服务器已关闭"<<endl;
+    }else if(resv=="discorrect")
+    {
+        cout<<"密码错误"<<endl;
 
-    
+    }else if(resv=="nonexisent")
+    {
+        cout<<"帐号不存在,请先注册"<<endl;
+        return 0;
+
+    }else if(resv=="ok")
+    {
+        cout<<"登陆成功"<<endl;
+
+        pthread_t tid;
+       // Pthread_create(&tid,NULL,tfn,(void *)uid);//tfn功能为将用户uid添加到在线列表中
+
+        //放一个登陆成功之后进行下一步选择的函数
+        Func_menu();//功能菜单函数
+    }
+
+    return 0;
+
 }
+
+// int main()
+// {
+//     Login();
+//     Func_menu();
+// }
+
+
