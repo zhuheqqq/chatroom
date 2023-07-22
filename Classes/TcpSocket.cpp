@@ -1,6 +1,6 @@
 #include<nlohmann/json.hpp>
 #include "TcpSocket.hpp"
-#include "wrap.hpp"
+#include "../Server/wrap.hpp"
 
 TcpSocket::TcpSocket()
 {
@@ -92,7 +92,7 @@ string TcpSocket::RecvMsg()
 
     char *buf=new char[len+1];
 
-    int ret=readn(buf,len);
+    ret=readn(buf,len);
     if(ret!=len)
     {
         return to_string(len);
