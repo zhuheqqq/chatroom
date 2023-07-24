@@ -11,7 +11,10 @@ class TcpSocket
 public:
     TcpSocket();
     TcpSocket(int fd);
+    TcpSocket(string msg);
     ~TcpSocket();
+    int getfd(){return fd;}
+    int getresvfd(){return recv_fd;}
     int SendMsg(string msg);
     string RecvMsg();
 
@@ -20,5 +23,6 @@ public:
 
 
 private:
-    int fd=-1;
+    int fd=-1;//向服务器发送消息
+    int recv_fd=-1;//接收服务器发送的消息
 };

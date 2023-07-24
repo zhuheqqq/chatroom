@@ -12,6 +12,15 @@ TcpSocket::TcpSocket(int fd)
     fd=this->fd;
 }
 
+TcpSocket::TcpSocket(string msg)
+{
+    if(msg=="recv")
+    {
+        fd=Socket(AF_INET,SOCK_STREAM,0);
+        recv_fd=Socket(AF_INET,SOCK_STREAM,0);
+    }
+}
+
 TcpSocket::~TcpSocket(){}//析构函数
 
 int TcpSocket::readn(char *buf,int size)
@@ -65,45 +74,85 @@ int TcpSocket::writen(const char *msg,int size)
     return size;//返回成功发送的字节数
 }
 
-int TcpSocket::SendMsg(string msg)
-{
-    char *data=new char[msg.size()+4];//开辟地址空间
-    int biglen=htonl(msg.size());//字节序转换
+// int TcpSocket::SendMsg(string msg)
+// {
+//     char *data=new char[msg.size()+4];//开辟地址空间
+//     int biglen=htonl(msg.size());//字节序转换
 
-    memcpy(data,&biglen,4);//将数据头先复制到data中
-    memcpy(data+4,msg.data(),msg.size());//将后续字符串复制到data中
+//     memcpy(data,&biglen,4);//将数据头先复制到data中
+//     memcpy(data+4,msg.data(),msg.size());//将后续字符串复制到data中
 
-    int ret=writen(data,msg.size()+4);//发送数据
+//     int ret=writen(data,msg.size()+4);//发送数据
 
-    delete[]data;//释放内存空间
+//     delete[]data;//释放内存空间
 
-    return ret;
-}
+//     return ret;
+// }
+
+// string TcpSocket::RecvMsg()
+// {
+//     //接收数据头
+//     int len=0;
+//     int ret=readn((char *)&len,4);
+//     if(ret==0){
+//         return "close1";
+//     }
+//     len=ntohl(len);
+
+//     char *buf=new char[len+1];
+
+//     ret=readn(buf,len);
+//     if(ret!=len)
+//     {
+//         return to_string(len);
+//     }else if(ret==0)
+//     {
+//         close(fd);
+//         return "close";
+//     }
+
+//     buf[len]='\0';
+//     string msg(buf);
+//     delete[]buf;
+
+//     return msg;
+// }
 
 string TcpSocket::RecvMsg()
 {
-    //接收数据头
-    int len=0;
-    int ret=readn((char *)&len,4);
-    if(ret==0){
-        return "close";
-    }
-    len=ntohl(len);
+    // 接收数据
+    // 1. 读数据头
+    int len = 0;
+    readn((char*)&len, 4);
+    len = ntohl(len);
+    cout << "数据块大小: " << len << endl;
 
-    char *buf=new char[len+1];
-
-    ret=readn(buf,len);
-    if(ret!=len)
+    // 根据读出的长度分配内存
+    char* buf = new char[len + 1];
+    int ret = readn(buf, len);
+    if (ret != len)
     {
-        return to_string(len);
-    }else if(ret==0)
-    {
-        close(fd);
-        return "close";
+        return string();
     }
+    buf[len] = '\0';
+    string retStr(buf);
+    delete[]buf;
 
-    buf[len]='\0';
-    string msg(buf);
-
-    return msg;
+    return retStr;
 }
+
+
+int TcpSocket::SendMsg(string msg)
+{
+    // 申请内存空间: 数据长度 + 包头4字节(存储数据长度)
+    char* data = new char[msg.size() + 4];
+    int bigLen = htonl(msg.size());
+    memcpy(data, &bigLen, 4);
+    memcpy(data + 4, msg.data(), msg.size());
+    // 发送数据
+    int ret = writen(data, msg.size() + 4);
+    delete[]data;
+    return ret;
+}
+
+
