@@ -7,11 +7,24 @@
 #include<cstdlib>
 #include "../Classes/UserCommand.hpp"
 #include "../Classes/TcpSocket.cpp"
-#include "../Server/func.hpp"
+#include "../Server/option.hpp"
 #include "../Server/wrap.hpp"
 #include "Menu.hpp"
 
 using namespace std;
+TcpSocket mysocket;
+
+struct RecvArg
+{
+    string uid;
+    int recv_fd=-1;
+    RecvArg(string myuid,int Recv_uid):uid(myuid),recv_fd(Recv_uid){}
+};
+
+/*void *recvfunc(void *)
+{
+    
+}*/
 
 void setup();
 void Sign_menu();
@@ -37,7 +50,7 @@ string get_uid()
     int flag=1,c;
     
     cout<<"您的uid帐号为:"<<endl;
-    cin.ignore();//清空缓冲区
+    cin.ignore();//忽略缓冲区剩余内容
     getline(cin,uid);//获取输入的uid
 
     for(int c:uid)
@@ -74,7 +87,6 @@ string get_uid()
 //登陆模块
 int Login()
 {
-    TcpSocket mysocket;
     
     while(1)
     {
@@ -121,8 +133,6 @@ int Sign_up(TcpSocket mysocket)//注册
 
     while(1){
         cin.ignore();//忽略缓冲区多余字符        
-        cout<<"请输入昵称:"<<endl;
-        getline(cin,nickname);//读入昵称
         
        // cin.sync();//清空缓冲区,使用这个函数导致nickname无法输入
         cout<<"请输入密码:"<<endl;
@@ -146,7 +156,11 @@ int Sign_up(TcpSocket mysocket)//注册
         }
         
     }
-    UserCommand command("NULL",nickname,SIGNUP,{pwd});//假设1为让服务器随机生成一个uid
+
+   // cout << "pwd: " << pwd << endl;
+
+
+    UserCommand command("","",SIGNUP,{pwd});//假设1为让服务器随机生成一个uid
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     if(ret==0||ret==-1)
     {
@@ -174,32 +188,41 @@ int Log_in(TcpSocket mysocket)//登陆
     cout<<"请输入您的密码:"<<endl;
     getline(cin,password);
 
-    UserCommand command(uid,"NULL",LOGIN,{password});//LOGIN含义为让服务器端比对密码
+    UserCommand command(uid,nullptr,LOGIN,{password});//LOGIN含义为让服务器端比对密码
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
+    
+    
+    /*UserCommand testCommand("test_uid", "recv_uid", 0, {"option1", "option2"});
+    string json = testCommand.To_Json();
+    cout << "发送请求：" << json << endl<<std::endl;
+    int ret = mysocket.SendMsg(json);*/
+    
+
+
     if(ret==0||ret==-1)
     {
         cout<<"服务器已关闭"<<endl;
         exit(0);
     }
 
-    string resv=mysocket.RecvMsg();//接收返回的结果
-    if(resv=="close")//接收服务器端返回的字符打印提示信息
+    string recv=mysocket.RecvMsg();//接收返回的结果
+    if(recv=="close")//接收服务器端返回的字符打印提示信息
     {
         cout<<"服务器已关闭"<<endl;
-    }else if(resv=="discorrect")
+    }else if(recv=="discorrect")
     {
         cout<<"密码错误"<<endl;
 
-    }else if(resv=="nonexisent")
+    }else if(recv=="nonexisent")
     {
         cout<<"帐号不存在,请先注册"<<endl;
         return 0;
 
-    }else if(resv=="ok")
+    }else if(recv=="ok")
     {
         cout<<"登陆成功"<<endl;
 
-        pthread_t tid;
+        //pthread_t tid;
        // Pthread_create(&tid,NULL,tfn,(void *)uid);//tfn功能为将用户uid添加到在线列表中
 
         //放一个登陆成功之后进行下一步选择的函数
@@ -210,10 +233,18 @@ int Log_in(TcpSocket mysocket)//登陆
 
 }
 
-// int main()
-// {
-//     Login();
-//     Func_menu();
-// }
+int main()
+{
+    struct sockaddr_in caddr;
+    caddr.sin_family=AF_INET;
+    caddr.sin_port=htons(9999);
+    inet_pton(AF_INET,"127.0.0.1",&caddr.sin_addr.s_addr);//将ip地址转换成网络字节序
+
+    int ret=Connect(mysocket.getfd(),(struct sockaddr *)&caddr,sizeof(caddr));
+
+    //cout << "Connected to the server." << endl;
+
+    Login();
+}
 
 
