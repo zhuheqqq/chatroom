@@ -33,6 +33,13 @@ ssize_t Readn(int fd,void *vptr,size_t n);
 ssize_t Writen(int fd,const void *vptr,size_t n);
 static ssize_t my_read(int fd,char *ptr);
 ssize_t Readline(int fd,void *vptr,size_t maxlen);
+int recvMsg(int cfd,char** msg);
+int Pthread_create(pthread_t *thread,
+                   const pthread_attr_t *attr,
+                   void*(*start_routinue)(void *),
+                   void *arg);
+int Pthread_detach(pthread_t thread);
+
 
 
 void perr_exit(const char *s)
@@ -263,6 +270,55 @@ ssize_t Readline(int fd,void *vptr,size_t maxlen)
     }
     *ptr=0;
     return n;
+}
+
+int Pthread_create(pthread_t *thread,const pthread_attr_t *attr,void *(*start_routine)(void *),void *arg)
+                          {
+                            int ret=pthread_create(thread,NULL,start_routine,arg);
+                            if(ret!=0)
+                            {
+                                perror("pthread_create error");
+                                exit(0);
+                            }
+
+                            return ret;
+                          }
+
+
+int Pthread_detach(pthread_t thread)
+{
+    int ret=pthread_detach(thread);
+    if(ret!=0)
+    {
+        perror("pthread_detach error");
+        exit(0);
+    }
+
+    return ret;
+}
+
+int recvMsg(int cfd,char** msg)//接受带数据头的数据包
+{
+    //接收数据头
+    int len=0;
+    Readn(cfd,(char *)&len,4);
+    len=ntohl(len);
+   // printf("数据块大小为%d\n",len);
+
+    char *buf=(char *)malloc(len+1);//留出存储'\0'的位置
+    int ret=Readn(cfd,buf,len);
+    /*if(ret!=len)
+    {
+        printf("数据接收失败\n");
+    }else if(ret==0){
+        printf("对方断开连接\n");
+        close(cfd);
+    }*/
+
+    buf[len]='\0';
+    *msg=buf;
+
+    return ret;//返回接收的字节数
 }
 
 
