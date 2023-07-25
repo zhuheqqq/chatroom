@@ -114,6 +114,7 @@ int Login()
         }else if(choice==2)
         {
             Log_in(mysocket);
+            break;
 
         }else if(choice==3)
         {
@@ -124,6 +125,8 @@ int Login()
             continue;
         }
     }
+
+    return 1;
 }
 
 int Sign_up(TcpSocket mysocket)//注册
@@ -157,8 +160,6 @@ int Sign_up(TcpSocket mysocket)//注册
         
     }
 
-   // cout << "pwd: " << pwd << endl;
-
 
     UserCommand command("","",SIGNUP,{pwd});//假设1为让服务器随机生成一个uid
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
@@ -173,7 +174,8 @@ int Sign_up(TcpSocket mysocket)//注册
         cout<<"对端已关闭"<<endl;
         exit(0);
     }
-    cout<<"您注册的uid为:"<<uid<<endl;
+    cout<<"您注册的uid为:"<<uid<<",这是您身份的唯一标识,请牢记"<<endl;
+    cout<<"请登陆"<<endl;
 
     return 0;
 }   
@@ -181,23 +183,18 @@ int Sign_up(TcpSocket mysocket)//注册
 
 int Log_in(TcpSocket mysocket)//登陆
 {
-    string uid,password;
+    string uid,pwd;
     uid=get_uid();
 
-    //cin.ignore();
+    //
     cout<<"请输入您的密码:"<<endl;
-    getline(cin,password);
+    getline(cin,pwd);
+    
+    //cin.ignore();
 
-    UserCommand command(uid,nullptr,LOGIN,{password});//LOGIN含义为让服务器端比对密码
+    UserCommand command(uid,"",LOGIN,{pwd});//LOGIN含义为让服务器端比对密码
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     
-    
-    /*UserCommand testCommand("test_uid", "recv_uid", 0, {"option1", "option2"});
-    string json = testCommand.To_Json();
-    cout << "发送请求：" << json << endl<<std::endl;
-    int ret = mysocket.SendMsg(json);*/
-    
-
 
     if(ret==0||ret==-1)
     {
@@ -226,25 +223,12 @@ int Log_in(TcpSocket mysocket)//登陆
        // Pthread_create(&tid,NULL,tfn,(void *)uid);//tfn功能为将用户uid添加到在线列表中
 
         //放一个登陆成功之后进行下一步选择的函数
-        Func_menu();//功能菜单函数
+        //Func_menu();//功能菜单函数
     }
 
     return 0;
 
 }
 
-int main()
-{
-    struct sockaddr_in caddr;
-    caddr.sin_family=AF_INET;
-    caddr.sin_port=htons(9999);
-    inet_pton(AF_INET,"127.0.0.1",&caddr.sin_addr.s_addr);//将ip地址转换成网络字节序
-
-    int ret=Connect(mysocket.getfd(),(struct sockaddr *)&caddr,sizeof(caddr));
-
-    //cout << "Connected to the server." << endl;
-
-    Login();
-}
 
 

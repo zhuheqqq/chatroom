@@ -19,7 +19,7 @@ void Sign_menu()
 //功能函数菜单
 void Func_menu()
 {
-    system("clear");
+    system("clear");//清屛
     cout<<"------------------------------------------------------------"<<endl;
     cout<<"-                   Welcome to chatroom                    -"<<endl;
     cout<<"------------------------------------------------------------"<<endl;
