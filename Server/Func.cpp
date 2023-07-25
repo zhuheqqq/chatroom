@@ -20,7 +20,7 @@ public:
 };
 
 void Sign_up(TcpSocket mysocket,UserCommand command);
-//void Log_in(TcpSocket mysocket,UserCommand command);
+void Log_in(TcpSocket mysocket,UserCommand command);
 
 void task(void *arg)
 {
@@ -33,13 +33,15 @@ void task(void *arg)
         case SIGNUP:
             Sign_up(mysocket,command);
             break;
-        // case LOGIN:
-        //     Log_in(mysocket,command);
-        //     break;
+        case LOGIN:
+            Log_in(mysocket,command);
+            break;
     }
+
+    return;
 }
 
-void Sign_up(TcpSocket mysocket,UserCommand command)
+void Sign_up(TcpSocket mysocket,UserCommand command)//注册选项
 {
     while(1)
     {
@@ -52,7 +54,7 @@ void Sign_up(TcpSocket mysocket,UserCommand command)
         string uid = to_string(dis(gen));
         cout << "生成的随机 uid 为：" << uid << endl;
 
-        if(redis.sismember("用户uid合集",uid)){//随机到一个未注册的uid
+        if(redis.sismember("用户uid集合",uid)){//随机到一个未注册的uid
             //cout << "生成的随机 uid 为：" << uid << endl;
             continue;
         }else{
@@ -62,7 +64,7 @@ void Sign_up(TcpSocket mysocket,UserCommand command)
             redis.hsetValue(uid, "在线状态", "-1");
             redis.hsetValue(uid, "性别", "未知");
             redis.hsetValue(uid, "其他信息", "无");
-            redis.hsetValue(uid, "通知套接字", "-1");
+            //redis.hsetValue(uid, "通知套接字", "-1");
             redis.hsetValue(uid, "聊天对象", "无");
             redis.hsetValue(uid + "的未读消息", "通知消息", "0");
 
@@ -73,9 +75,36 @@ void Sign_up(TcpSocket mysocket,UserCommand command)
     }
 }
 
+void Log_in(TcpSocket mysocket,UserCommand command)
+{
+    //从数据库跳去对应的数据进行核对并回复结果
+    if(!redis.sismember("用户uid集合",command.m_uid)){//帐号不存在返回错误
+        mysocket.SendMsg("nonexisent");
+    }else{
+        //如果帐号存在进行密码比对
+        string pwd=redis.gethash(command.m_uid,"密码");
+        cout<<pwd<<endl;
+        if(pwd!=command.m_option[0])
+        {
+            mysocket.SendMsg("discorrect");
+
+        }else{
+            //密码正确，可以登陆改变其在线状态
+            redis.hsetValue(command.m_uid,"在线状态",to_string(mysocket.getfd()));
+            redis.hsetValue("fd-uid表",to_string(mysocket.getfd()),command.m_uid);
+            redis.hsetValue(command.m_uid,"聊天对象","0");
+           // redis.hsetValue(command.m_uid,"通知套接字","-1");
+           mysocket.SendMsg("ok");
+           cout<<"用户"<<command.m_uid<<"登陆成功"<<endl;
+        }
+    }
+
+    return;
+}
+
 int main()
 {
-    
+    redis.createUidSet();
 
     int lfd=0,cfd=0;
     char *buf;
@@ -94,9 +123,11 @@ int main()
     //设置上限数
     Listen(lfd,128);
 
-    //阻塞等待连接
+   
+    
     while(1)
     {
+        //阻塞等待连接
         socklen_t len=sizeof(caddr);
         cfd=Accept(lfd,(struct sockaddr*)&caddr,&len);
 
@@ -117,7 +148,7 @@ int main()
         Argc_func argc_func(TcpSocket(cfd),command_string);
         task(&argc_func);
 
-        //close(cfd);
+        close(cfd);
 
     }
     
