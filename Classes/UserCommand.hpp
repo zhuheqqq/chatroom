@@ -1,5 +1,5 @@
 /*处理命令的属性和序列化（将对象转换为 JSON 字符串）*/
-
+#pragma once
 #include<iostream>
 #include<string>
 #include<vector>
