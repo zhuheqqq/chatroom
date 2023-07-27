@@ -29,8 +29,8 @@ struct RecvArg
 void setup();
 void Sign_menu();
 int Login();
-int Log_in(TcpSocket socket);
-int Sign_up(TcpSocket socket);
+int Log_in(TcpSocket mysocket);
+int Sign_up(TcpSocket mysocket);
 string get_uid();
 void Func_menu();
 
@@ -227,3 +227,6 @@ int Log_in(TcpSocket mysocket)//登陆
     return 0;
 
 }
+
+
+

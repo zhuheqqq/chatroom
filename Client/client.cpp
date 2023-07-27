@@ -3,6 +3,8 @@
 #include "../Server/wrap.hpp"
 #include "../Classes/TcpSocket.hpp"
 #include "../Classes/UserCommand.hpp"
+ 
+// TcpSocket mysocket;
 
 void Log_out(TcpSocket mysocket) // 注销功能函数
 {
@@ -10,7 +12,7 @@ void Log_out(TcpSocket mysocket) // 注销功能函数
 }
 
 int FriendManage(TcpSocket mysocket, UserCommand command);
-int Friend_List(TcpSocket mysocket, UserCommand command);
+int FriendList(TcpSocket mysocket, UserCommand command);
 int Add_Friend(TcpSocket mysocket, UserCommand command);
 int Delete_Friend(TcpSocket mysocket, UserCommand command);
 int AgreeAddFriend(TcpSocket mysocket, UserCommand command);
@@ -22,7 +24,6 @@ int ChatWithFriend(TcpSocket mysocket,UserCommand command);
 
 int main()
 {
-    TcpSocket mysocket;
     UserCommand command;
 
     mysocket.ConnectToHost("127.0.0.1", 9999);
@@ -90,7 +91,7 @@ int FriendManage(TcpSocket mysocket, UserCommand command)
     switch (option)
     {
         case 1:
-            Friend_List(mysocket,command);
+            FriendList(mysocket,command);
             break;
         case 2:
             Add_Friend(mysocket, command);
@@ -309,7 +310,7 @@ int RefuseAddFriend(TcpSocket mysocket,UserCommand command)
     }
 }
 
-int Block_Friend(TcpSocket mysocket, UserCommand command)
+int Block_Friend(TcpSocket mysocket, UserCommand command)//屏蔽好友
 {
     string blockuid;//屏蔽好友
     cout<<"您想屏蔽该好友uid为:"<<endl;
@@ -355,7 +356,6 @@ int Restore_Friend(TcpSocket mysocket,UserCommand command)
 
     UserCommand command1(command.m_uid,"",RESTOREFRIEND,{restoreuid});
     int ret = mysocket.SendMsg(command1.To_Json());
-    int ret = mysocket.SendMsg(command.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
