@@ -131,7 +131,6 @@ int Login()
 
 int Sign_up(TcpSocket mysocket)//注册
 {
-    string nickname;//昵称
     string pwd,pwd2;//密码
 
     while(1){
@@ -161,7 +160,7 @@ int Sign_up(TcpSocket mysocket)//注册
     }
 
 
-    UserCommand command("","",SIGNUP,{pwd});//假设1为让服务器随机生成一个uid
+    UserCommand command("","",SIGNUP,{pwd});//假设SIGNUP为让服务器随机生成一个uid
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     if(ret==0||ret==-1)
     {
@@ -190,12 +189,9 @@ int Log_in(TcpSocket mysocket)//登陆
     cout<<"请输入您的密码:"<<endl;
     getline(cin,pwd);
     
-    //cin.ignore();
-
     UserCommand command(uid,"",LOGIN,{pwd});//LOGIN含义为让服务器端比对密码
-    int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     
-
+    int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     if(ret==0||ret==-1)
     {
         cout<<"服务器已关闭"<<endl;
@@ -206,6 +202,7 @@ int Log_in(TcpSocket mysocket)//登陆
     if(recv=="close")//接收服务器端返回的字符打印提示信息
     {
         cout<<"服务器已关闭"<<endl;
+       
     }else if(recv=="discorrect")
     {
         cout<<"密码错误"<<endl;
@@ -223,12 +220,10 @@ int Log_in(TcpSocket mysocket)//登陆
        // Pthread_create(&tid,NULL,tfn,(void *)uid);//tfn功能为将用户uid添加到在线列表中
 
         //放一个登陆成功之后进行下一步选择的函数
-        //Func_menu();//功能菜单函数
+        Func_menu();//功能菜单函数
     }
 
+   
     return 0;
 
 }
-
-
-
