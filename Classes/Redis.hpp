@@ -102,6 +102,20 @@ public:
         }
     }
 
+//构建好友列表哈希表的键，格式为“用户uid的好友列表”
+    void addFriendToFriendList(const std::string& userID, const std::string& friendID, const std::string& friendInfo) {
+    std::string friendListKey = userID + "的好友列表";
+
+    // 使用HSET命令将好友信息添加到用户的好友列表哈希表中
+    bool result = hsetValue(friendListKey, friendID, friendInfo);
+
+    if (result) {
+        std::cout << "好友添加成功！" << std::endl;
+    } else {
+        std::cout << "好友添加失败！" << std::endl;
+    }
+}
+
 private:
     redisContext* context; // 指向Redis连接的上下文指针。
 };
