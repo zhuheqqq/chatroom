@@ -7,6 +7,8 @@
 #include<hiredis/hiredis.h>
 #include<string>
 #include<random>
+#include<fcntl.h>
+#include<sys/epoll.h>
 
 using namespace std;
 Redis redis;
@@ -21,6 +23,7 @@ public:
 
 void Sign_up(TcpSocket mysocket,UserCommand command);
 void Log_in(TcpSocket mysocket,UserCommand command);
+//void Add_Friend(TcpSocket mysocket,UserCommand command);
 
 void task(void *arg)
 {
@@ -35,6 +38,9 @@ void task(void *arg)
             break;
         case LOGIN:
             Log_in(mysocket,command);
+            break;
+        case ADDFRIEND:
+            Add_Friend(mysocket,command);
             break;
     }
 
@@ -75,15 +81,17 @@ void Sign_up(TcpSocket mysocket,UserCommand command)//注册选项
     }
 }
 
-void Log_in(TcpSocket mysocket,UserCommand command)
+void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
 {
+    cout<<"2"<<endl;
     //从数据库跳去对应的数据进行核对并回复结果
     if(!redis.sismember("用户uid集合",command.m_uid)){//帐号不存在返回错误
         mysocket.SendMsg("nonexisent");
     }else{
         //如果帐号存在进行密码比对
+        cout<<"1"<<endl;
         string pwd=redis.gethash(command.m_uid,"密码");
-        cout<<pwd<<endl;
+        //cout<<pwd<<endl;
         if(pwd!=command.m_option[0])
         {
             mysocket.SendMsg("discorrect");
@@ -102,57 +110,106 @@ void Log_in(TcpSocket mysocket,UserCommand command)
     return;
 }
 
+void Add_Friend(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.sismember("用户uid集合",command.m_recvuid))//如果没有找到该用户返回错误
+    {
+        mysocket.SendMsg("none");
+        return;
+    }
+}
+
 int main()
 {
     redis.createUidSet();
 
-    int lfd=0,cfd=0;
+    int lfd=0,cfd=0,efd=0; 
     char *buf;
 
     struct sockaddr_in saddr,caddr;
     saddr.sin_family=AF_INET;
-    saddr.sin_port=htons(9999);
+    saddr.sin_port=htons(6666);
     saddr.sin_addr.s_addr=htonl(INADDR_ANY);
 
     //创建套接字
     lfd=Socket(AF_INET,SOCK_STREAM,0);
-    
+    //bzero(&saddr,sizeof(saddr));
+
+    //设置端口复用
+    int opt = 1;
+    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
     //绑定地址
     Bind(lfd,(struct sockaddr *)&saddr,sizeof(saddr));
     
     //设置上限数
     Listen(lfd,128);
 
-   
+    struct epoll_event event;
+    struct epoll_event resevent[1024];
+    int size = sizeof(resevent) / sizeof(struct epoll_event);
     
+
+    efd=epoll_create(100);//创建红黑树
+    event.events=EPOLLIN|EPOLLET;//ET边缘触发
+
+    event.data.fd=lfd;
+    int ret=epoll_ctl(efd,EPOLL_CTL_ADD,lfd,&event);
+    if(ret==-1)
+    {
+        perr_exit("epoll_ctl");
+    }
+       
     while(1)
     {
-        //阻塞等待连接
-        socklen_t len=sizeof(caddr);
-        cfd=Accept(lfd,(struct sockaddr*)&caddr,&len);
-
-        int ret=recvMsg(cfd,&buf);
-        if(ret<=0)
+        int num=epoll_wait(efd,resevent,size,-1);
+        for(int i=0;i<num;++i)
         {
-            cerr<<"error receiving data ."<<endl;
-            close(cfd);
-            continue;
+            //取出当前文件描述符
+            int curfd=resevent[i].data.fd;
+            //判断文件描述符是否用于监听
+            if(curfd==lfd)
+            {
+                //建立新的连接
+                int cfd=Accept(curfd,NULL,NULL);
+
+                int flag = fcntl(cfd, F_GETFL);
+                flag |= O_NONBLOCK;
+                fcntl(cfd, F_SETFL, flag);
+
+                // 新得到的文件描述符添加到epoll模型中, 下一轮循环的时候就可以被检测了
+                event.events = EPOLLIN|EPOLLET;    // 读缓冲区是否有数据
+                event.data.fd = cfd;
+                ret = epoll_ctl(efd, EPOLL_CTL_ADD, cfd, &event);
+                if(ret == -1)
+                {
+                    perror("epoll_ctl-accept");
+                    exit(0);
+                }
+            }else{
+                //处理通信的文件描述符
+                //接收数据
+                char *buf;
+               // memset(buf,0,sizeof(buf));用就出现段错误
+
+                int ret=recvMsg(curfd,&buf);
+                if(ret<=0)
+                {
+                    cerr<<"error receiving data ."<<endl;
+                    close(curfd);
+                    continue;
+                }
+
+                buf[ret]='\0';
+                string command_string=buf;
+                
+                cout<<"Recrived request:"<<command_string<<endl;
+                //创建任务，处理客户端请求
+                Argc_func argc_func(TcpSocket(curfd),command_string);
+                task(&argc_func);
+            }
         }
 
-        buf[ret]='\0';
-        string command_string=buf;
-        
-        cout<<"Recrived request:"<<command_string<<endl;
-
-        //创建任务，处理客户端请求
-        Argc_func argc_func(TcpSocket(cfd),command_string);
-        task(&argc_func);
-
-        close(cfd);
-
-    }
-    
-
-    
+    }  
     
 }
