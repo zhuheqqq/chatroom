@@ -1,3 +1,4 @@
+#pragma once
 #define SIGNUP 1
 #define LOGIN 2
 #define LOGOUT 3
@@ -9,3 +10,9 @@
 #define BLOCKFRIEND 9
 #define RESTOREFRIEND 10
 #define VIEWONLINESTATUS 11
+
+
+// ANSI 转义码设置文本颜色
+#define L_GREEN "\033[1;32m"
+#define NONE "\033[0m"
+#define L_WHITE "\033[1;37m"

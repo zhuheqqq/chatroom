@@ -23,7 +23,10 @@ public:
 
 void Sign_up(TcpSocket mysocket,UserCommand command);
 void Log_in(TcpSocket mysocket,UserCommand command);
-//void Add_Friend(TcpSocket mysocket,UserCommand command);
+void Add_Friend(TcpSocket mysocket,UserCommand command);
+void FriendList(TcpSocket mysocket,UserCommand command);
+void Block_Friend(TcpSocket mysocket,UserCommand command);
+void Restore_Friend(TcpSocket mysocket,UserCommand command);
 
 void task(void *arg)
 {
@@ -39,8 +42,17 @@ void task(void *arg)
         case LOGIN:
             Log_in(mysocket,command);
             break;
+        case FRIENDLIST:
+            FriendList(mysocket,command);
+            break;    
         case ADDFRIEND:
             Add_Friend(mysocket,command);
+            break;
+        case BLOCKFRIEND:
+            Block_Friend(mysocket,command);
+            break;
+        case RESTOREFRIEND:
+            Restore_Friend(mysocket,command);
             break;
     }
 
@@ -83,15 +95,12 @@ void Sign_up(TcpSocket mysocket,UserCommand command)//注册选项
 
 void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
 {
-    cout<<"2"<<endl;
     //从数据库跳去对应的数据进行核对并回复结果
     if(!redis.sismember("用户uid集合",command.m_uid)){//帐号不存在返回错误
         mysocket.SendMsg("nonexisent");
     }else{
         //如果帐号存在进行密码比对
-        cout<<"1"<<endl;
         string pwd=redis.gethash(command.m_uid,"密码");
-        //cout<<pwd<<endl;
         if(pwd!=command.m_option[0])
         {
             mysocket.SendMsg("discorrect");
@@ -110,11 +119,84 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
     return;
 }
 
-void Add_Friend(TcpSocket mysocket,UserCommand command)
+void FriendList(TcpSocket mysocket,UserCommand command)
+{
+    // 好友数量不为0，就遍历好友列表，根据在线状态发送要展示的内容
+    vector<string> friendList = redis.getFriendList(command.m_uid,"的好友列表");
+
+    for (const string& friendID : friendList) {
+        string friendMark = redis.gethash(command.m_uid, friendID);
+        //考虑TCP心跳监测
+        string isOnline = redis.gethash(friendID, "在线状态");//无法获取实时的在线状态需要修改
+
+        if (!redis.sismember(command.m_uid + "的屏蔽列表", friendID)) {
+            if (isOnline != "-1") {
+                mysocket.SendMsg(L_GREEN + friendMark + NONE + "(" + friendID + ")");
+            } else {
+                mysocket.SendMsg(L_WHITE + friendMark + NONE + "(" + friendID + ")");
+            }
+        }
+    }
+
+    mysocket.SendMsg("end");//展示完毕
+
+}
+
+void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
 {
     if(!redis.sismember("用户uid集合",command.m_recvuid))//如果没有找到该用户返回错误
     {
         mysocket.SendMsg("none");
+        return;
+    }
+    //遍历好友列表，判断帐号是否已经是自己的好友
+    int num=redis.getListCount(command.m_uid,"的好友列表");//获得好友数量
+    if(num!=0){
+        vector<string> friendlist=redis.getFriendList(command.m_uid,"的好友列表");
+
+        auto it=find(friendlist.begin(),friendlist.end(),command.m_recvuid);
+        if(it!=friendlist.end())
+        {
+            mysocket.SendMsg("exist");//好友已存在
+        }
+    }
+}
+
+void Block_Friend(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("none");//不存在该好友
+        return;
+    }
+    //如果好友已经被屏蔽
+    int num=redis.getListCount(command.m_uid,"的屏蔽列表");//屏蔽列表中好友的数量
+    if(num!=0)
+    {
+        vector<string> blocklist=redis.getFriendList(command.m_uid,"的屏蔽列表");
+
+        auto it=find(blocklist.begin(),blocklist.end(),command.m_option[0]);
+        if(it!=blocklist.end())
+        {
+            mysocket.SendMsg("handled");
+        }
+    }else{//正常屏蔽好友
+        redis.addToBlockedList(command.m_uid,command.m_option[0]);
+        mysocket.SendMsg("ok");
+        return;
+    }
+}
+
+void Restore_Friend(TcpSocket mysocket,UserCommand command)//没写完，缺解除屏蔽
+{
+    if(!redis.sismember(command.m_uid+"的屏蔽列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("no");//该好友未被屏蔽
+        return;
+    }
+    if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("none");//不存在该好友
         return;
     }
 }
@@ -133,7 +215,6 @@ int main()
 
     //创建套接字
     lfd=Socket(AF_INET,SOCK_STREAM,0);
-    //bzero(&saddr,sizeof(saddr));
 
     //设置端口复用
     int opt = 1;
