@@ -191,6 +191,7 @@ int Log_in(TcpSocket mysocket)//登陆
 {
     string uid,pwd;
     uid=get_uid();
+    Curcommand.m_uid=uid;
 
     //
     cout<<"请输入您的密码:"<<endl;
@@ -223,6 +224,7 @@ int Log_in(TcpSocket mysocket)//登陆
 
     }else if(recv=="ok")
     {
+        system("clear");
         cout<<"登陆成功"<<endl;
         return 1;
 

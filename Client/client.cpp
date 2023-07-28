@@ -10,6 +10,7 @@
 
 void Log_out();//注销函数
 int FriendManage();//好友管理函数
+int GroupManage();//群聊管理函数
 int FriendList();//展示好友列表
 int Add_Friend();//添加好友
 int Delete_Friend();//删除好友
@@ -57,11 +58,13 @@ int main()
             else if (option == 2)
             {
                 // 跳转到群聊管理界面
+                GroupManage();
             }
             else if (option == 3)
             {
                 // 注销账户，主要是将redis中uid集合中的该uid删除
                 Log_out();
+                exit(0);
             }
             else
             {
@@ -74,55 +77,100 @@ int main()
 
 int FriendManage()
 {
-    Friend_menu();
-    int option;
-
-    cout << "请输入您的选项：" << endl;
-    cin >> option;
-
-    if (cin.eof()) // 检查是否到达文件结尾即有ctrl+d信号的出现
+    while(1)
     {
-        cout << "Reached the end of the input" << endl;
-        return 0;
-    }
+        Friend_menu();
+        int option;
 
-    cin.clear(); // 清除输入流的错误状态
-    cin.sync();  // 清空输入缓冲区
+        cout << "请输入您的选项：" << endl;
+        cin >> option;
 
-    switch (option)
-    {
-        case 1:
-            FriendList();
-            break;
-        case 2:
-            Add_Friend();
-            break;
-        case 3:
-            Delete_Friend();
-            break;
-        case 4:
-            AgreeAddFriend();
-            break;
-        case 5:
-            RefuseAddFriend();
-            break;
-        case 6:
-            Block_Friend();
-            break;
-        case 7:
-            Restore_Friend();
-            break;
-        case 8:
-            View_OnlineStatus();
-            break;
-        case 9:
-            ChatWithFriend();
-            break;
-        default:
-            cout<<"输入错误,请重新输入："<<endl;
-            break;
+        if (cin.eof()) // 检查是否到达文件结尾即有ctrl+d信号的出现
+        {
+            cout << "Reached the end of the input" << endl;
+            return 0;
+        }
+
+        cin.clear(); // 清除输入流的错误状态
+        cin.sync();  // 清空输入缓冲区
+
+        switch (option)
+        {
+            case 1:
+                FriendList();
+                break;
+            case 2:
+                Add_Friend();
+                break;
+            case 3:
+                Delete_Friend();
+                break;
+            case 4:
+                AgreeAddFriend();
+                break;
+            case 5:
+                RefuseAddFriend();
+                break;
+            case 6:
+                Block_Friend();
+                break;
+            case 7:
+                Restore_Friend();
+                break;
+            case 8:
+                View_OnlineStatus();
+                break;
+            case 9:
+                ChatWithFriend();
+                break;
+            default:
+                cout<<"输入错误,请重新输入："<<endl;
+                continue;
+        }
     }
+    
     return 0;
+}
+
+int GroupManage()
+{
+    while(1)
+    {
+        Group_menu();//群聊功能菜单
+
+        int option; // 选项
+
+        cout << "请输入您的选项：" << endl;
+        cin >> option;
+
+        if (cin.eof()) // 检查是否到达文件结尾即有ctrl+d信号的出现
+        {
+            cout << "Reached the end of the input" << endl;
+            return 0;
+        }
+
+        cin.clear(); // 清除输入流的错误状态
+        cin.sync();  // 清空输入缓冲区
+
+        if(option==1)
+        {
+            //查看群聊列表
+            break;
+        }else if(option==2)
+        {
+            //创建群聊
+            break;
+        }else if(option==3)
+        {
+            //添加群聊
+            break;
+        }else{
+            cout<<"输入错误,请重新输入"<<endl;
+        }
+
+    }
+    
+
 }
 
 void Log_out() // 注销功能函数
@@ -198,7 +246,7 @@ int Add_Friend()
     cin.ignore();
     getline(cin,option);
 
-    cout<< ":"<< Curcommand.m_uid<<endl;
+    //cout<< ":"<< Curcommand.m_uid<<endl;
     UserCommand command1(Curcommand.m_uid,recv_uid,ADDFRIEND,{option});//将发送者和接收者的uid以及发送者发送的验证消息打包
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
@@ -222,14 +270,14 @@ int Add_Friend()
         cout << "该用户已经是您的好友,无需反复添加" << endl;
         return 0;
     }
-    else if (recv == "apply")
+    /*else if (recv == "apply")
     {
         cout << "您的系统消息中存在对方发送的好友申请,请先回复" << endl;
-    }
-    else if (recv == "handled")
+    }*/
+    /*else if (recv == "handled")
     {
         cout << "您已经向该用户发送过好友申请,请等待回复" << endl;
-    }
+    }*/
     else if(recv=="none")
     {
         cout << "该用户不存在" << endl;
@@ -366,6 +414,7 @@ int Block_Friend()//屏蔽好友
         return 0;
     }else if(recv=="handled")
     {
+        system("clear");
         cout<<"您已屏蔽过该好友,无需重复操作"<<endl;
     }else
     {
@@ -403,6 +452,7 @@ int Restore_Friend()
         return 0;
     }else if(recv=="no")
     {
+        system("clear");
         cout<<"该好友未被屏蔽"<<endl;
         return 0;
     }else{

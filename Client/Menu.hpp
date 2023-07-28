@@ -36,7 +36,7 @@ void Func_menu()
 //好友管理菜单
 void Friend_menu()
 {
-    system("clear");
+    //system("clear");
     cout<<"------------------------------------------------------------"<<endl;
     cout<<"-           Welcome to friend management interface         -"<<endl;
     cout<<"------------------------------------------------------------"<<endl;
@@ -58,7 +58,7 @@ void Friend_menu()
 //群聊管理菜单
 void Group_menu()
 {
-    system("clear");
+    //system("clear");
     cout<<"------------------------------------------------------------"<<endl;
     cout<<"-            Welcome to group management interface         -"<<endl;
     cout<<"------------------------------------------------------------"<<endl;
