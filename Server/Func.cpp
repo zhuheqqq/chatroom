@@ -23,7 +23,9 @@ public:
 
 void Sign_up(TcpSocket mysocket,UserCommand command);
 void Log_in(TcpSocket mysocket,UserCommand command);
+void Log_out(TcpSocket mysocket,UserCommand command);
 void Add_Friend(TcpSocket mysocket,UserCommand command);
+void Delete_Friend(TcpSocket mysocket,UserCommand command);
 void FriendList(TcpSocket mysocket,UserCommand command);
 void Block_Friend(TcpSocket mysocket,UserCommand command);
 void Restore_Friend(TcpSocket mysocket,UserCommand command);
@@ -42,11 +44,17 @@ void task(void *arg)
         case LOGIN:
             Log_in(mysocket,command);
             break;
+        case LOGOUT:
+            Log_out(mysocket,command);
+            break;
         case FRIENDLIST:
             FriendList(mysocket,command);
             break;    
         case ADDFRIEND:
             Add_Friend(mysocket,command);
+            break;
+        case DELETEFRIEND:
+            Delete_Friend(mysocket,command);
             break;
         case BLOCKFRIEND:
             Block_Friend(mysocket,command);
@@ -119,6 +127,19 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
     return;
 }
 
+//销毁账户
+void Log_out(TcpSocket mysocket,UserCommand commmand)
+{
+    if(redis.removeMember("","用户uid集合",commmand.m_uid))
+    {
+        mysocket.SendMsg("ok");
+        return;
+    }
+
+}
+
+
+//如果好友列表可以展示在线状态，那么就没有必要有查看好友在线状态的选项
 void FriendList(TcpSocket mysocket,UserCommand command)
 {
     // 好友数量不为0，就遍历好友列表，根据在线状态发送要展示的内容
@@ -158,8 +179,26 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
         if(it!=friendlist.end())
         {
             mysocket.SendMsg("exist");//好友已存在
+            return;
         }
     }
+
+    //redis.addFriendToFriendList(command.m_uid,command.m_option[0],"好友信息");
+}
+
+void Delete_Friend(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("none");//不存在该好友
+        return;
+    }else if(redis.removeMember(command.m_uid,"的好友列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("ok");//成功将该好友从好友列表中删除
+        return;
+    }
+        
+    
 }
 
 void Block_Friend(TcpSocket mysocket,UserCommand command)
@@ -187,30 +226,32 @@ void Block_Friend(TcpSocket mysocket,UserCommand command)
     }
 }
 
-void Restore_Friend(TcpSocket mysocket,UserCommand command)//没写完，缺解除屏蔽
+void Restore_Friend(TcpSocket mysocket,UserCommand command)
 {
     if(!redis.sismember(command.m_uid+"的屏蔽列表",command.m_option[0]))
     {
         mysocket.SendMsg("no");//该好友未被屏蔽
         return;
-    }
-    if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
+    }else if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
     {
         mysocket.SendMsg("none");//不存在该好友
+        return;
+    }else{
+        redis.removeMember(command.m_uid,"的屏蔽列表",command.m_option[0]);//好友成功解除屏蔽
+        mysocket.SendMsg("ok");
         return;
     }
 }
 
 int main()
 {
-    redis.createUidSet();
 
     int lfd=0,cfd=0,efd=0; 
     char *buf;
 
     struct sockaddr_in saddr,caddr;
     saddr.sin_family=AF_INET;
-    saddr.sin_port=htons(6666);
+    saddr.sin_port=htons(9999);
     saddr.sin_addr.s_addr=htonl(INADDR_ANY);
 
     //创建套接字
