@@ -163,12 +163,10 @@ bool removeMember(const string& userID,const string& listType, const string& fri
 
     // 使用 HDEL 命令从列表中移除好友
     redisReply* reply = (redisReply*)redisCommand(context, "HDEL %s %s", friendListKey.c_str(), friendID.c_str());
-    if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER && reply->integer == 1) {
+    if (reply != nullptr) {
+        bool success = (reply->integer > 0); // 判断整数值是否大于0，表示删除成功
         freeReplyObject(reply);
-        return true;
-    } 
-    if (reply) {
-        freeReplyObject(reply);
+        return success;
     }
     return false;
 }
