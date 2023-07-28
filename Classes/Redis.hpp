@@ -91,18 +91,6 @@ public:
     }
 }
 
-// 创建 "用户uid集合" 的键空间并将其数据类型设置为集合（Set）
-    void createUidSet() {
-        const string key = "用户uid集合";
-        const string dummyValue = "dummy"; // 添加一个虚拟的值，因为 SADD 需要至少一个元素
-
-        // 使用 SADD 命令添加虚拟值到集合中，如果集合不存在则会创建
-        redisReply* reply = (redisReply*)redisCommand(context, "SADD %s %s", key.c_str(), dummyValue.c_str());
-        if (reply != nullptr) {
-            freeReplyObject(reply);
-        }
-    }
-
 //创建好友列表以及往好友列表里添加好友
 void addFriendToFriendList(const string& userID, const string& friendID, const string& friendInfo) {
     string friendListKey = userID + "的好友列表";
@@ -154,7 +142,7 @@ void addToBlockedList(const string& userID, const string& blockedID) {
     }
 
 //获取指定的好友列表或者屏蔽列表
-vector<string> Redis::getFriendList(const string& userID,const string& listType) {
+vector<string> getFriendList(const string& userID,const string& listType) {
     string friendListKey = userID + listType;
     vector<string> friendList;
 
@@ -167,6 +155,22 @@ vector<string> Redis::getFriendList(const string& userID,const string& listType)
         freeReplyObject(reply);
     }
     return friendList;
+}
+
+// 从列表中移除好友
+bool removeMember(const string& userID,const string& listType, const string& friendID) {
+    string friendListKey = userID + listType;
+
+    // 使用 HDEL 命令从列表中移除好友
+    redisReply* reply = (redisReply*)redisCommand(context, "HDEL %s %s", friendListKey.c_str(), friendID.c_str());
+    if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER && reply->integer == 1) {
+        freeReplyObject(reply);
+        return true;
+    } 
+    if (reply) {
+        freeReplyObject(reply);
+    }
+    return false;
 }
 
 private:
