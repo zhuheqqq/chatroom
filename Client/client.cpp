@@ -3,28 +3,28 @@
 #include "../Server/wrap.hpp"
 #include "../Classes/TcpSocket.hpp"
 #include "../Classes/UserCommand.hpp"
+#include "../Server/option.hpp"
  
-// TcpSocket mysocket;
+ extern TcpSocket mysocket;
+ UserCommand Curcommand;
 
-void Log_out(TcpSocket mysocket) // 注销功能函数
-{
-    mysocket.SendMsg("Log_out");
-}
+void Log_out();//注销函数
+int FriendManage();//好友管理函数
+int FriendList();//展示好友列表
+int Add_Friend();//添加好友
+int Delete_Friend();//删除好友
+int AgreeAddFriend();//同意好友申请
+int RefuseAddFriend();//拒绝好友申请
+int Block_Friend();//屏蔽好友
+int Restore_Friend();//恢复好友会话
+int View_OnlineStatus();//查看好友在线状态
+int ChatWithFriend();//聊天
 
-int FriendManage(TcpSocket mysocket, UserCommand command);
-int FriendList(TcpSocket mysocket, UserCommand command);
-int Add_Friend(TcpSocket mysocket, UserCommand command);
-int Delete_Friend(TcpSocket mysocket, UserCommand command);
-int AgreeAddFriend(TcpSocket mysocket, UserCommand command);
-int RefuseAddFriend(TcpSocket mysocket,UserCommand command);
-int Block_Friend(TcpSocket mysocket, UserCommand command);
-int Restore_Friend(TcpSocket mysocket,UserCommand command);
-int View_OnlineStatus(TcpSocket mysocket,UserCommand command);
-int ChatWithFriend(TcpSocket mysocket,UserCommand command);
+
 
 int main()
 {
-    UserCommand command;
+    //UserCommand Curcommand;
 
     mysocket.ConnectToHost("127.0.0.1", 9999);
 
@@ -52,7 +52,7 @@ int main()
             if (option == 1)
             {
                 // 跳转到好友管理界面
-                FriendManage(mysocket, command);
+                FriendManage();
             }
             else if (option == 2)
             {
@@ -61,6 +61,7 @@ int main()
             else if (option == 3)
             {
                 // 注销账户，主要是将redis中uid集合中的该uid删除
+                Log_out();
             }
             else
             {
@@ -71,7 +72,7 @@ int main()
     }
 }
 
-int FriendManage(TcpSocket mysocket, UserCommand command)
+int FriendManage()
 {
     Friend_menu();
     int option;
@@ -91,31 +92,31 @@ int FriendManage(TcpSocket mysocket, UserCommand command)
     switch (option)
     {
         case 1:
-            FriendList(mysocket,command);
+            FriendList();
             break;
         case 2:
-            Add_Friend(mysocket, command);
+            Add_Friend();
             break;
         case 3:
-            Delete_Friend(mysocket,command);
+            Delete_Friend();
             break;
         case 4:
-            AgreeAddFriend(mysocket, command);
+            AgreeAddFriend();
             break;
         case 5:
-            RefuseAddFriend(mysocket, command);
+            RefuseAddFriend();
             break;
         case 6:
-            Block_Friend(mysocket, command);
+            Block_Friend();
             break;
         case 7:
-            Restore_Friend(mysocket, command);
+            Restore_Friend();
             break;
         case 8:
-            View_OnlineStatus(mysocket, command);
+            View_OnlineStatus();
             break;
         case 9:
-            ChatWithFriend(mysocket, command);
+            ChatWithFriend();
             break;
         default:
             cout<<"输入错误,请重新输入："<<endl;
@@ -124,10 +125,35 @@ int FriendManage(TcpSocket mysocket, UserCommand command)
     return 0;
 }
 
-int FriendList(TcpSocket mysocket, UserCommand command)
+void Log_out() // 注销功能函数
 {
-    UserCommand command1(command.m_uid,"",FRIENDLIST,{""});//展示好友列表
-    int ret = mysocket.SendMsg(command.To_Json());
+    UserCommand command1(Curcommand.m_uid,"",LOGOUT,{""});
+    int ret=mysocket.SendMsg(command1.To_Json());
+    if(ret==0||ret==-1)
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }
+
+    string recv=mysocket.RecvMsg();
+    if(recv=="close")
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }else if(recv=="ok")
+    {
+        cout<<"您已成功注销账户,感谢您的使用"<<endl;
+        return;
+    }else{
+        cout<<"其他错误"<<endl;
+        return;
+    }
+}
+
+int FriendList()
+{
+    UserCommand command1(Curcommand.m_uid,"",FRIENDLIST,{""});//展示好友列表
+    int ret = mysocket.SendMsg(Curcommand.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -161,19 +187,19 @@ int FriendList(TcpSocket mysocket, UserCommand command)
     return 1;
 }
 
-int Add_Friend(TcpSocket mysocket, UserCommand command)
+int Add_Friend()
 {
     string recv_uid;//接收者的uid,或者说要添加好友的uid
     string option;//发送的验证消息
-    cout<<"您想添加的好友的uid为:"<<endl;
+    cout<<"您想添加的好友的uid为:"<<endl; 
     cin>>recv_uid;
 
     cout<<"您想发送的验证消息为"<<endl;
     cin.ignore();
     getline(cin,option);
 
-    
-    UserCommand command1(command.m_uid,recv_uid,ADDFRIEND,{option});//将发送者和接收者的uid以及发送者发送的验证消息打包
+    cout<< ":"<< Curcommand.m_uid<<endl;
+    UserCommand command1(Curcommand.m_uid,recv_uid,ADDFRIEND,{option});//将发送者和接收者的uid以及发送者发送的验证消息打包
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -214,14 +240,14 @@ int Add_Friend(TcpSocket mysocket, UserCommand command)
     }
 }
 
-int Delete_Friend(TcpSocket mysocket, UserCommand command)
+int Delete_Friend()
 {
     string deleteuid;//想删除的好友的uid
 
     cout<<"请输入您想删除的好友的uid:"<<endl;
     cin>>deleteuid;
 
-    UserCommand command1(command.m_uid,"",DELETEFRIEND,{deleteuid});
+    UserCommand command1(Curcommand.m_uid,"",DELETEFRIEND,{deleteuid});
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -250,13 +276,13 @@ int Delete_Friend(TcpSocket mysocket, UserCommand command)
     }
 }
 
-int AgreeAddFriend(TcpSocket mysocket, UserCommand command)
+int AgreeAddFriend()
 {
     string agreeuid;//同意好友申请的好友的uid
     cout<<"您想同意加好友申请的好友uid为:"<<endl;
     cin>>agreeuid;
 
-    UserCommand command1(command.m_uid,"",AGREEADDFRIEND,{agreeuid});
+    UserCommand command1(Curcommand.m_uid,"",AGREEADDFRIEND,{agreeuid});
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -272,7 +298,7 @@ int AgreeAddFriend(TcpSocket mysocket, UserCommand command)
     }
     else if (recv == "ok")
     {
-        cout << "已通过" << command.m_uid << "的好友申请" << endl;
+        cout << "已通过" << Curcommand.m_uid << "的好友申请" << endl;
         return 1;
     }else
     {
@@ -281,13 +307,13 @@ int AgreeAddFriend(TcpSocket mysocket, UserCommand command)
     }
 }
 
-int RefuseAddFriend(TcpSocket mysocket,UserCommand command)
+int RefuseAddFriend()
 {
     string refuseuid;//拒绝好友申请的好友的uid
     cout<<"您想拒绝加好友申请的uid为:"<<endl;
     cin>>refuseuid;
 
-    UserCommand command1(command.m_uid,"",REFUSEADDFRIEND,{refuseuid});
+    UserCommand command1(Curcommand.m_uid,"",REFUSEADDFRIEND,{refuseuid});
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -302,7 +328,7 @@ int RefuseAddFriend(TcpSocket mysocket,UserCommand command)
         exit(0);
     }else if(recv=="ok")
     {
-        cout<<"已拒绝"<<command.m_uid<<"的好友申请"<<endl;
+        cout<<"已拒绝"<<Curcommand.m_uid<<"的好友申请"<<endl;
         return 1;
     }else{
         cout<<"其他错误"<<endl;
@@ -310,13 +336,13 @@ int RefuseAddFriend(TcpSocket mysocket,UserCommand command)
     }
 }
 
-int Block_Friend(TcpSocket mysocket, UserCommand command)//屏蔽好友
+int Block_Friend()//屏蔽好友
 {
     string blockuid;//屏蔽好友
     cout<<"您想屏蔽该好友uid为:"<<endl;
     cin>>blockuid;
 
-    UserCommand command1(command.m_uid,"",BLOCKFRIEND,{blockuid});
+    UserCommand command1(Curcommand.m_uid,"",BLOCKFRIEND,{blockuid});
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -348,13 +374,13 @@ int Block_Friend(TcpSocket mysocket, UserCommand command)//屏蔽好友
     }
 }
 
-int Restore_Friend(TcpSocket mysocket,UserCommand command)
+int Restore_Friend()
 {
     string restoreuid;//恢复好友会话
     cout<<"您想屏蔽该好友uid为:"<<endl;
     cin>>restoreuid;
 
-    UserCommand command1(command.m_uid,"",RESTOREFRIEND,{restoreuid});
+    UserCommand command1(Curcommand.m_uid,"",RESTOREFRIEND,{restoreuid});
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -385,13 +411,13 @@ int Restore_Friend(TcpSocket mysocket,UserCommand command)
     }
 }
 
-int View_OnlineStatus(TcpSocket mysocket,UserCommand command)
+int View_OnlineStatus()
 {
     string viewuid;//屏蔽好友
     cout<<"您想查看在线状态的好友uid为:"<<endl;
     cin>>viewuid;
 
-    UserCommand command1(command.m_uid,"",VIEWONLINESTATUS,{viewuid});
+    UserCommand command1(Curcommand.m_uid,"",VIEWONLINESTATUS,{viewuid});
     int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -406,11 +432,11 @@ int View_OnlineStatus(TcpSocket mysocket,UserCommand command)
         exit(0);
     }else if(recv=="ok")
     {
-        cout<<"用户"<<command.m_uid<<"现在在线,快去找ta聊天吧"<<endl;
+        cout<<"用户"<<Curcommand.m_uid<<"现在在线,快去找ta聊天吧"<<endl;
         return 1;
     }else if(recv=="no")
     {
-        cout<<"用户"<<command.m_uid<<"现在不在线,有事请留言"<<endl;
+        cout<<"用户"<<Curcommand.m_uid<<"现在不在线,有事请留言"<<endl;
         return 1;
     }else{
         cout<<"其他错误"<<endl;
@@ -418,7 +444,7 @@ int View_OnlineStatus(TcpSocket mysocket,UserCommand command)
     }
 }
 
-int ChatWithFriend(TcpSocket mysocket,UserCommand command)
+int ChatWithFriend()
 {
 
 }

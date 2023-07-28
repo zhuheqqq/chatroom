@@ -10,8 +10,10 @@
 #include "../Server/option.hpp"
 #include "../Server/wrap.hpp"
 #include "Menu.hpp"
+//#include "client.cpp"
 
 using namespace std;
+extern UserCommand Curcommand;
 TcpSocket mysocket;
 
 struct RecvArg
@@ -87,6 +89,7 @@ string get_uid()
 //登陆模块
 int Login()
 {
+    int flag=0;
     
     while(1)
     {
@@ -113,9 +116,11 @@ int Login()
 
         }else if(choice==2)
         {
-            Log_in(mysocket);
-            break;
-
+            flag=Log_in(mysocket);
+            if(flag==1){
+                break;
+            }
+            
         }else if(choice==3)
         {
             exit(0);
@@ -173,7 +178,9 @@ int Sign_up(TcpSocket mysocket)//注册
         cout<<"对端已关闭"<<endl;
         exit(0);
     }
+    Curcommand.m_uid=uid;
     cout<<"您注册的uid为:"<<uid<<",这是您身份的唯一标识,请牢记"<<endl;
+
     cout<<"请登陆"<<endl;
 
     return 0;
@@ -202,10 +209,12 @@ int Log_in(TcpSocket mysocket)//登陆
     if(recv=="close")//接收服务器端返回的字符打印提示信息
     {
         cout<<"服务器已关闭"<<endl;
+        exit(0);
        
     }else if(recv=="discorrect")
     {
-        cout<<"密码错误"<<endl;
+        cout<<"密码错误,请重新输入："<<endl;
+        return 0;
 
     }else if(recv=="nonexisent")
     {
@@ -215,18 +224,17 @@ int Log_in(TcpSocket mysocket)//登陆
     }else if(recv=="ok")
     {
         cout<<"登陆成功"<<endl;
+        return 1;
 
         //pthread_t tid;
        // Pthread_create(&tid,NULL,tfn,(void *)uid);//tfn功能为将用户uid添加到在线列表中
 
         //放一个登陆成功之后进行下一步选择的函数
-        Func_menu();//功能菜单函数
+        //Func_menu();//功能菜单函数
     }
 
    
-    return 0;
+    return 1;
 
 }
-
-
 
