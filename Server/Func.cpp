@@ -128,13 +128,26 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
 }
 
 //销毁账户
-void Log_out(TcpSocket mysocket,UserCommand commmand)
+void Log_out(TcpSocket mysocket,UserCommand command)//功能没有实现，没有将uid从用户uid中删掉
 {
-    if(redis.removeMember("","用户uid集合",commmand.m_uid))
+    /*if(redis.removeMember("","用户uid集合",commmand.m_uid))
     {
         mysocket.SendMsg("ok");
         return;
+    }*/
+    // 获取该用户的好友列表
+    vector<string> friendList = redis.getFriendList(command.m_uid, "的好友列表");
+
+    for (const string& friendID : friendList) {
+        // 更新其他用户的好友列表，将该用户从好友列表中移除
+        redis.removeMember(friendID, "的好友列表", command.m_uid);
     }
+
+    //从好友列表中移除该用户的好友信息
+    redis.removeMember(command.m_uid, "的好友列表", "");
+
+    redis.removeMember("用户uid集合", "", command.m_uid); //从用户uid集合中移除
+    mysocket.SendMsg("ok");
 
 }
 
@@ -148,7 +161,7 @@ void FriendList(TcpSocket mysocket,UserCommand command)
     for (const string& friendID : friendList) {
         string friendMark = redis.gethash(command.m_uid, friendID);
         //考虑TCP心跳监测
-        string isOnline = redis.gethash(friendID, "在线状态");//无法获取实时的在线状态需要修改
+        string isOnline = redis.gethash(friendID, "在线状态");//无法获取实时的在线状态需要修改*/
 
         if (!redis.sismember(command.m_uid + "的屏蔽列表", friendID)) {
             if (isOnline != "-1") {
@@ -167,7 +180,7 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
 {
     if(!redis.sismember("用户uid集合",command.m_recvuid))//如果没有找到该用户返回错误
     {
-        mysocket.SendMsg("none");
+        mysocket.SendMsg("none");//该用户不存在
         return;
     }
     //遍历好友列表，判断帐号是否已经是自己的好友
@@ -184,6 +197,7 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
     }
 
     //redis.addFriendToFriendList(command.m_uid,command.m_option[0],"好友信息");
+
 }
 
 void Delete_Friend(TcpSocket mysocket,UserCommand command)
