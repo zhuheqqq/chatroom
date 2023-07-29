@@ -66,7 +66,7 @@ public:
         return false;// 返回false表示值未从哈希中获取
     }
 
-    // 函数用于检查成员是否存在于Redis集合中（使用SISMEMBER命令）
+    // 函数用于检查成员是否存在于Redis集合中（使用SISMEMBER命令）,用于集合
      bool sismember(const string& key, const string& member) {
         redisReply* reply = (redisReply*)redisCommand(context, "SISMEMBER %s %s", key.c_str(), member.c_str());
         if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER) {
@@ -157,19 +157,55 @@ vector<string> getFriendList(const string& userID,const string& listType) {
     return friendList;
 }
 
-// 从列表中移除好友
-bool removeMember(const string& userID,const string& listType, const string& friendID) {
-    string friendListKey = userID + listType;
-
+// 删除哈希表中指定的字段
+bool removeMember(const string& key,const string& field) {
     // 使用 HDEL 命令从列表中移除好友
-    redisReply* reply = (redisReply*)redisCommand(context, "HDEL %s %s", friendListKey.c_str(), friendID.c_str());
-    if (reply != nullptr) {
+    redisReply* reply = (redisReply*)redisCommand(context, "HDEL %s %s", key.c_str(), field.c_str());
+    if (reply != nullptr&&reply->type==REDIS_REPLY_INTEGER) {
         bool success = (reply->integer > 0); // 判断整数值是否大于0，表示删除成功
         freeReplyObject(reply);
         return success;
     }
     return false;
 }
+
+//删除集合中特定元素
+bool sremValue(const string& key, const string& member) {
+    // 发送 SREM 命令到 Redis 并存储回复。
+    redisReply* reply = (redisReply*)redisCommand(context, "SREM %s %s", key.c_str(), member.c_str());
+    if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER) {
+        bool success = (reply->integer > 0); // 判断整数值是否大于0，表示删除成功
+        freeReplyObject(reply);
+        return success;
+    }
+    return false; // 返回 false 表示删除失败或成员不存在
+}
+
+//删除一个键
+bool delKey(const string& key) {
+        // 发送 DEL 命令到 Redis 并存储回复。
+        redisReply* reply = (redisReply*)redisCommand(context, "DEL %s", key.c_str());
+        if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER) {
+            bool success = (reply->integer > 0); // 判断整数值是否大于0，表示删除成功
+            freeReplyObject(reply);
+            return success;
+        }
+        return false; // 返回 false 表示删除失败或键不存在
+    }
+
+//用于检查哈希表中是否存在指定的字段
+bool hexists(const string& key, const string& field) {
+    // 使用 HGET 命令获取指定字段的值
+    string value;
+    if (getHSetValue(key, field, value)) {
+        // 如果字段存在，返回 true
+        return true;
+    } else {
+        // 如果字段不存在或发生了错误，返回 false
+        return false;
+    }
+}
+
 
 private:
     redisContext* context; // 指向Redis连接的上下文指针。
