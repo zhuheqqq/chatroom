@@ -24,9 +24,11 @@ public:
 void Sign_up(TcpSocket mysocket,UserCommand command);
 void Log_in(TcpSocket mysocket,UserCommand command);
 void Log_out(TcpSocket mysocket,UserCommand command);
+void FriendList(TcpSocket mysocket,UserCommand command);
 void Add_Friend(TcpSocket mysocket,UserCommand command);
 void Delete_Friend(TcpSocket mysocket,UserCommand command);
-void FriendList(TcpSocket mysocket,UserCommand command);
+void AgreeAddFriend(TcpSocket mysocket,UserCommand command);
+void RefuseAddFriend(TcpSocket mysocket,UserCommand command);
 void Block_Friend(TcpSocket mysocket,UserCommand command);
 void Restore_Friend(TcpSocket mysocket,UserCommand command);
 
@@ -56,7 +58,13 @@ void task(void *arg)
         case DELETEFRIEND:
             Delete_Friend(mysocket,command);
             break;
+        case AGREEADDFRIEND:
+            AgreeAddFriend(mysocket,command);
+            break;
         case BLOCKFRIEND:
+            RefuseAddFriend(mysocket,command);
+            break;
+        case REFUSEADDFRIEND:
             Block_Friend(mysocket,command);
             break;
         case RESTOREFRIEND:
@@ -128,25 +136,25 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
 }
 
 //销毁账户
-void Log_out(TcpSocket mysocket,UserCommand command)//功能没有实现，没有将uid从用户uid中删掉
+void Log_out(TcpSocket mysocket,UserCommand command)//功能已实现
 {
-    /*if(redis.removeMember("","用户uid集合",commmand.m_uid))
-    {
-        mysocket.SendMsg("ok");
-        return;
-    }*/
     // 获取该用户的好友列表
     vector<string> friendList = redis.getFriendList(command.m_uid, "的好友列表");
 
     for (const string& friendID : friendList) {
         // 更新其他用户的好友列表，将该用户从好友列表中移除
-        redis.removeMember(friendID, "的好友列表", command.m_uid);
+        redis.removeMember(friendID+"的好友列表", command.m_uid);
     }
 
     //从好友列表中移除该用户的好友信息
-    redis.removeMember(command.m_uid, "的好友列表", "");
+    redis.delKey(command.m_uid+"的好友列表");
 
-    redis.removeMember("用户uid集合", "", command.m_uid); //从用户uid集合中移除
+    //删除uid当中存储的特殊的信息
+    redis.delKey(command.m_uid);//这一步成功执行
+    redis.delKey(command.m_uid+"的未读消息");//这一步成功执行
+
+    //这一步已实现，要删除集合中特定元素的值
+    redis.sremValue("用户uid集合", command.m_uid); //从用户uid集合中移除
     mysocket.SendMsg("ok");
 
 }
@@ -202,22 +210,31 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
 
 void Delete_Friend(TcpSocket mysocket,UserCommand command)
 {
-    if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
+    if(!redis.hexists(command.m_uid+"的好友列表",command.m_option[0]))
     {
         mysocket.SendMsg("none");//不存在该好友
         return;
-    }else if(redis.removeMember(command.m_uid,"的好友列表",command.m_option[0]))
+    }else if(redis.removeMember(command.m_uid+"的好友列表",command.m_option[0]))
     {
         mysocket.SendMsg("ok");//成功将该好友从好友列表中删除
         return;
     }
-        
-    
+}
+
+void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
+{
+
+}
+
+
+void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
+{
+
 }
 
 void Block_Friend(TcpSocket mysocket,UserCommand command)
 {
-    if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
+    if(!redis.hexists(command.m_uid+"的好友列表",command.m_option[0]))
     {
         mysocket.SendMsg("none");//不存在该好友
         return;
@@ -242,16 +259,16 @@ void Block_Friend(TcpSocket mysocket,UserCommand command)
 
 void Restore_Friend(TcpSocket mysocket,UserCommand command)
 {
-    if(!redis.sismember(command.m_uid+"的屏蔽列表",command.m_option[0]))
+    if(!redis.hexists(command.m_uid+"的屏蔽列表",command.m_option[0]))
     {
         mysocket.SendMsg("no");//该好友未被屏蔽
         return;
-    }else if(!redis.sismember(command.m_uid+"的好友列表",command.m_option[0]))
+    }else if(!redis.hexists(command.m_uid+"的好友列表",command.m_option[0]))
     {
         mysocket.SendMsg("none");//不存在该好友
         return;
     }else{
-        redis.removeMember(command.m_uid,"的屏蔽列表",command.m_option[0]);//好友成功解除屏蔽
+        redis.removeMember(command.m_uid+"的屏蔽列表",command.m_option[0]);//好友成功解除屏蔽
         mysocket.SendMsg("ok");
         return;
     }
