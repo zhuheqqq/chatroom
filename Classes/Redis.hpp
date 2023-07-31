@@ -206,6 +206,19 @@ bool hexists(const string& key, const string& field) {
     }
 }
 
+// 使用 LPUSH 命令将值插入列表头部
+    bool lpushValue(const string& key, const string& value) {
+        // 发送 LPUSH 命令到 Redis 并存储回复。
+        redisReply* reply = (redisReply*)redisCommand(context, "LPUSH %s %s", key.c_str(), value.c_str());
+        if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER) {
+            // 判断回复的整数值是否大于等于 0，表示插入成功。
+            bool success = (reply->integer >= 0);
+            freeReplyObject(reply);
+            return success;
+        }
+        return false; // 返回 false 表示插入失败
+    }
+
 
 private:
     redisContext* context; // 指向Redis连接的上下文指针。
