@@ -97,7 +97,7 @@ int Login()
 
         Sign_menu();
 
-        cout<<"请输入您的选项："<<endl;
+        cout<<"请输入您的选项:"<<endl;
         cin>>choice;
 
         if(cin.eof())//检查是否到达文件结尾即有ctrl+d信号的出现
@@ -126,7 +126,7 @@ int Login()
             exit(0);
 
         }else{
-            cout<<"输入错误,请重新输入："<<endl;
+            cout<<"输入错误,请重新输入:"<<endl;
             continue;
         }
     }
@@ -137,9 +137,15 @@ int Login()
 int Sign_up(TcpSocket mysocket)//注册
 {
     string pwd,pwd2;//密码
+    string nickname;//昵称
 
     while(1){
-        cin.ignore();//忽略缓冲区多余字符        
+        cin.ignore();//忽略缓冲区多余字符   
+
+        cout<<"请输入昵称:"<<endl;
+        getline(cin,nickname);    
+
+        //cin.ignore();//忽略缓冲区多余字符 
         
        // cin.sync();//清空缓冲区,使用这个函数导致nickname无法输入
         cout<<"请输入密码:"<<endl;
@@ -165,7 +171,7 @@ int Sign_up(TcpSocket mysocket)//注册
     }
 
 
-    UserCommand command("","",SIGNUP,{pwd});//假设SIGNUP为让服务器随机生成一个uid
+    UserCommand command("",nickname,"",SIGNUP,{pwd});//假设SIGNUP为让服务器随机生成一个uid
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     if(ret==0||ret==-1)
     {
@@ -179,6 +185,7 @@ int Sign_up(TcpSocket mysocket)//注册
         exit(0);
     }
     Curcommand.m_uid=uid;
+    Curcommand.m_nickname=nickname;
     cout<<"您注册的uid为:"<<uid<<",这是您身份的唯一标识,请牢记"<<endl;
 
     cout<<"请登陆"<<endl;
@@ -197,7 +204,7 @@ int Log_in(TcpSocket mysocket)//登陆
     cout<<"请输入您的密码:"<<endl;
     getline(cin,pwd);
     
-    UserCommand command(uid,"",LOGIN,{pwd});//LOGIN含义为让服务器端比对密码
+    UserCommand command(uid,"","",LOGIN,{pwd});//LOGIN含义为让服务器端比对密码
     
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     if(ret==0||ret==-1)
