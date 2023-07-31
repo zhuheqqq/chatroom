@@ -94,13 +94,15 @@ void Sign_up(TcpSocket mysocket,UserCommand command)//注册选项
         }else{
             redis.saddvalue("用户uid集合", uid);
             redis.hsetValue(uid, "账号", uid);
+            redis.hsetValue(uid, "昵称", command.m_nickname);
             redis.hsetValue(uid, "密码", command.m_option[0]);
             redis.hsetValue(uid, "在线状态", "-1");
             redis.hsetValue(uid, "性别", "未知");
             redis.hsetValue(uid, "其他信息", "无");
-            //redis.hsetValue(uid, "通知套接字", "-1");
+            redis.hsetValue(uid, "通知套接字", "-1");
             redis.hsetValue(uid, "聊天对象", "无");
             redis.hsetValue(uid + "的未读消息", "通知消息", "0");
+            redis.hsetValue(uid + "的未读消息", "好友申请", "0");
 
             mysocket.SendMsg(uid);
             cout<<"用户"<<uid<<"注册成功"<<endl;
@@ -160,6 +162,7 @@ void Log_out(TcpSocket mysocket,UserCommand command)//功能已实现
 }
 
 
+//没有实现
 //如果好友列表可以展示在线状态，那么就没有必要有查看好友在线状态的选项
 void FriendList(TcpSocket mysocket,UserCommand command)
 {
@@ -184,6 +187,8 @@ void FriendList(TcpSocket mysocket,UserCommand command)
 
 }
 
+//加好友太麻烦了，先判断自己的系统消息里是否有对方的好友申请，再判断自己是否已经发送过好友申请（我觉得这个可以不要)
+
 void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
 {
     if(!redis.sismember("用户uid集合",command.m_recvuid))//如果没有找到该用户返回错误
@@ -203,9 +208,34 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
             return;
         }
     }
+    //如果自己的系统消息里有对方发来的未处理的好友申请，就不能向对方发送好友请求
+    if(redis.hexists(command.m_uid+"收到的好友申请",command.m_recvuid))
+    {
+        //string msg=redis.gethash(command.m_uid+"的通知消息",command.m_recvuid);
+        //string flag(msg.end()-11,msg.end());
+        //if(flag=="(未处理)")
+        //{
+            mysocket.SendMsg("apply");
+            return;
+        //}
+        
+    }
+    //如果已经向对方发送过好友申请未被处理，则不能再次发送申请
+    if(redis.hexists(command.m_recvuid+"收到的好友申请",command.m_uid))
+    {
+        mysocket.SendMsg("handle");
+        return;
+    }
 
-    //redis.addFriendToFriendList(command.m_uid,command.m_option[0],"好友信息");
+    //如果以上情况都没有发生，就在对方的好友申请里更新自己的好友申请
+    //string wait="(未处理)";
+    string apply="来自"+command.m_uid+"的好友申请:"+command.m_option[0];
+    redis.hsetValue(command.m_recvuid+"收到的好友申请",command.m_uid,apply);
+    //对方未读消息加1
+    string nums=redis.gethash(command.m_recvuid+"的未读消息","好友申请");
+    redis.hsetValue(command.m_recvuid+"的未读消息","好友申请",to_string(stoi(nums)+1));
 
+    mysocket.SendMsg("ok");
 }
 
 void Delete_Friend(TcpSocket mysocket,UserCommand command)
@@ -216,6 +246,7 @@ void Delete_Friend(TcpSocket mysocket,UserCommand command)
         return;
     }else if(redis.removeMember(command.m_uid+"的好友列表",command.m_option[0]))
     {
+        redis.removeMember(command.m_option[0]+"的好友列表",command.m_uid);
         mysocket.SendMsg("ok");//成功将该好友从好友列表中删除
         return;
     }
@@ -223,12 +254,74 @@ void Delete_Friend(TcpSocket mysocket,UserCommand command)
 
 void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
 {
+    //查看通知消息里有没有他的申请
+    if(!redis.hexists(command.m_uid+"收到的好友申请",command.m_option[0]))
+    {
+        mysocket.SendMsg("nofind");
+        return;
+    }
 
+    //如果已经处理过该好友申请
+    /*string msg=redis.gethash(command.m_uid+"的通知消息",command.m_recvuid);
+    string flag(msg.end()-11,msg.end());
+    if(flag=="(已拒绝)"||flag=="(已通过)")
+    {
+        mysocket.SendMsg("handle");
+        return;
+    }*/
+    //没有上述情况正常同意
+
+    if(redis.removeMember(command.m_uid+"收到的好友申请",command.m_option[0]))
+    {
+        string nownum = redis.gethash(command.m_uid + "的未读消息", "好友申请");
+        redis.hsetValue(command.m_uid + "的未读消息", "好友申请", (to_string(stoi(nownum) - 1)));
+        //完善同意者信息
+        string nickname=redis.gethash(command.m_option[0],"昵称");
+        cout<<nickname<<endl;
+        redis.hsetValue(command.m_uid+"的好友列表",command.m_option[0],nickname);
+        redis.lpushValue(command.m_uid+"---"+command.m_option[0],"-------------------");
+
+        //完善申请者信息
+        //command.m_nickname不可以正确输出
+        redis.hsetValue(command.m_option[0]+"的好友列表",command.m_uid,command.m_nickname);
+        redis.lpushValue(command.m_option[0]+"---"+command.m_uid,"-------------------");
+
+        redis.lpushValue(command.m_option[0]+"的通知消息",command.m_uid+"通过了您的好友申请");
+
+        // 申请者未读消息中的通知消息数量+1
+        string num1 = redis.gethash(command.m_option[0] + "的未读消息", "通知消息");
+        redis.hsetValue(command.m_option[0] + "的未读消息", "通知消息", to_string(stoi(num1)+1));
+
+        mysocket.SendMsg("ok");
+        return;
+
+    }
 }
 
 
 void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
 {
+    //查看通知消息里有没有他的申请
+    if(!redis.hexists(command.m_uid+"收到的好友申请",command.m_option[0]))
+    {
+        mysocket.SendMsg("nofind");
+        return;
+    }
+    if(redis.removeMember(command.m_uid+"收到的好友申请",command.m_option[0]))
+    {
+        //拒绝者未读消息好友申请
+        string nownum = redis.gethash(command.m_uid + "的未读消息", "好友申请");
+        redis.hsetValue(command.m_uid + "的未读消息", "好友申请", (to_string(stoi(nownum) - 1)));
+        
+        
+        
+        // 申请者未读消息中的通知消息数量+1
+        string num1 = redis.gethash(command.m_option[0] + "的未读消息", "通知消息");
+        redis.hsetValue(command.m_option[0] + "的未读消息", "通知消息", to_string(stoi(num1)+1));
+        redis.lpushValue(command.m_option[0]+"的通知消息",command.m_uid+"拒绝了您的好友申请");
+
+        mysocket.SendMsg("ok");
+    }
 
 }
 
