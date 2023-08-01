@@ -22,17 +22,20 @@ public:
     string command_string;
 };
 
-void Sign_up(TcpSocket mysocket,UserCommand command);
-void Log_in(TcpSocket mysocket,UserCommand command);
-void Log_out(TcpSocket mysocket,UserCommand command);
-void FriendList(TcpSocket mysocket,UserCommand command);
-void Add_Friend(TcpSocket mysocket,UserCommand command);
-void Delete_Friend(TcpSocket mysocket,UserCommand command);
-void AgreeAddFriend(TcpSocket mysocket,UserCommand command);
-void RefuseAddFriend(TcpSocket mysocket,UserCommand command);
-void Block_Friend(TcpSocket mysocket,UserCommand command);
-void Restore_Friend(TcpSocket mysocket,UserCommand command);
-void UnreadMessage(TcpSocket mysocket,UserCommand command);
+void Sign_up(TcpSocket mysocket,UserCommand command);//注册
+void Log_in(TcpSocket mysocket,UserCommand command);//登陆
+void Log_out(TcpSocket mysocket,UserCommand command);//注销
+void FriendList(TcpSocket mysocket,UserCommand command);//展示好友列表
+void Add_Friend(TcpSocket mysocket,UserCommand command);//添加好友
+void Delete_Friend(TcpSocket mysocket,UserCommand command);//删除好友
+void AgreeAddFriend(TcpSocket mysocket,UserCommand command);//同意好友请求
+void RefuseAddFriend(TcpSocket mysocket,UserCommand command);//拒绝好友请求
+void Block_Friend(TcpSocket mysocket,UserCommand command);//屏蔽好友
+void Restore_Friend(TcpSocket mysocket,UserCommand command);//恢复会话
+void UnreadMessage(TcpSocket mysocket,UserCommand command);//未读消息
+void ChatWithFriend(TcpSocket mysocket,UserCommand command);//私聊
+void AddGroup(TcpSocket mysocket,UserCommand command);//加群
+void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
 
 void task(void *arg)
 {
@@ -74,6 +77,15 @@ void task(void *arg)
             break;
         case UNREADMESSAGE:
             UnreadMessage(mysocket,command);
+            break;
+        case CHATWITHFRIEND:
+            ChatWithFriend(mysocket,command);
+            break;
+        case ADDGROUP:
+            AddGroup(mysocket,command);
+            break;
+        case CREATEGROUP:
+            CreateGroup(mysocket,command);
             break;
     }
 
@@ -153,12 +165,15 @@ void Log_out(TcpSocket mysocket,UserCommand command)//功能已实现
         redis.removeMember(friendID+"的好友列表", command.m_uid);
     }
 
-    //从好友列表中移除该用户的好友信息
+    //移除该用户的好友列表
     redis.delKey(command.m_uid+"的好友列表");
+    //移除该用户的屏蔽列表
+    redis.delKey(command.m_uid+"的屏蔽列表");
 
     //删除uid当中存储的特殊的信息
     redis.delKey(command.m_uid);//这一步成功执行
     redis.delKey(command.m_uid+"的未读消息");//这一步成功执行
+    redis.delKey(command.m_uid+"的通知消息");
 
     //这一步已实现，要删除集合中特定元素的值
     redis.sremValue("用户uid集合", command.m_uid); //从用户uid集合中移除
@@ -167,7 +182,7 @@ void Log_out(TcpSocket mysocket,UserCommand command)//功能已实现
 }
 
 
-//没有实现
+//没有实现//已实现
 //如果好友列表可以展示在线状态，那么就没有必要有查看好友在线状态的选项
 void FriendList(TcpSocket mysocket,UserCommand command)
 {
@@ -194,8 +209,6 @@ void FriendList(TcpSocket mysocket,UserCommand command)
 
 }
 
-//加好友太麻烦了，先判断自己的系统消息里是否有对方的好友申请，再判断自己是否已经发送过好友申请（我觉得这个可以不要)
-
 void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
 {
     if(!redis.sismember("用户uid集合",command.m_recvuid))//如果没有找到该用户返回错误
@@ -218,13 +231,8 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
     //如果自己的系统消息里有对方发来的未处理的好友申请，就不能向对方发送好友请求
     if(redis.hexists(command.m_uid+"收到的好友申请",command.m_recvuid))
     {
-        //string msg=redis.gethash(command.m_uid+"的通知消息",command.m_recvuid);
-        //string flag(msg.end()-11,msg.end());
-        //if(flag=="(未处理)")
-        //{
-            mysocket.SendMsg("apply");
-            return;
-        //}
+        mysocket.SendMsg("apply");
+        return;
         
     }
     //如果已经向对方发送过好友申请未被处理，则不能再次发送申请
@@ -235,7 +243,6 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
     }
 
     //如果以上情况都没有发生，就在对方的好友申请里更新自己的好友申请
-    //string wait="(未处理)";
     string apply="来自"+command.m_uid+"的好友申请:"+command.m_option[0];
     redis.hsetValue(command.m_recvuid+"收到的好友申请",command.m_uid,apply);
     //对方未读消息加1
@@ -268,14 +275,6 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
         return;
     }
 
-    //如果已经处理过该好友申请
-    /*string msg=redis.gethash(command.m_uid+"的通知消息",command.m_recvuid);
-    string flag(msg.end()-11,msg.end());
-    if(flag=="(已拒绝)"||flag=="(已通过)")
-    {
-        mysocket.SendMsg("handle");
-        return;
-    }*/
     //没有上述情况正常同意
 
     if(redis.removeMember(command.m_uid+"收到的好友申请",command.m_option[0]))
