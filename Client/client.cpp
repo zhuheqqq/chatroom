@@ -21,6 +21,8 @@ int Restore_Friend();//恢复好友会话
 int View_OnlineStatus();//查看好友在线状态
 int ChatWithFriend();//聊天
 void UnreadMessage();//查看未读消息
+void AddGroup();//添加群聊
+void CreateGroup();//创建群聊
 
 
 
@@ -169,10 +171,12 @@ int GroupManage()
         }else if(option==2)
         {
             //创建群聊
+            CreateGroup();
             break;
         }else if(option==3)
         {
             //添加群聊
+            AddGroup();
             break;
         }else{
             system("clear");
@@ -482,7 +486,7 @@ int Restore_Friend()
     }
 }
 
-int View_OnlineStatus()
+int View_OnlineStatus()//没有实现
 {
     string viewuid;//屏蔽好友
     cout<<"您想查看在线状态的好友uid为:"<<endl;
@@ -517,6 +521,18 @@ int View_OnlineStatus()
 
 int ChatWithFriend()
 {
+    //发送私聊请求
+    string recvuid;
+    cout<<"您想聊天好友的uid为:"<<endl;
+    cin>>recvuid;
+
+    UserCommand command1(Curcommand.m_uid,Curcommand.m_nickname,recvuid,CHATWITHFRIEND,{""});
+    int ret = mysocket.SendMsg(command1.To_Json());
+    if (ret == 0||ret == -1)
+    {
+        cout << "服务器端已关闭" << endl;
+        exit(0);
+    }
 
 }
 
@@ -544,5 +560,38 @@ void UnreadMessage()
         cout<<recv<<endl;
     }
     
+}
+
+void AddGroup()
+{
+    string groupuid;//群聊的uid
+    cout<<"您想加入的群聊的uid为:"<<endl;
+    cin>>groupuid;
+
+    UserCommand command1(Curcommand.m_uid,Curcommand.m_nickname,"",ADDGROUP,{groupuid});
+    int ret=mysocket.SendMsg(command1.To_Json());
+    if(ret==0||ret==-1)
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }
+
+    string recv=mysocket.RecvMsg();
+    if(recv=="close")
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }else if(recv=="handled")
+    {
+        cout<<"您已在该群聊中,无需反复加群"<<endl;
+        return;
+    }else if(recv=="ok")
+    {
+        cout<<"加群申请已发送,请耐心等待回复"<<endl;
+        return;
+    }else{
+        cout<<"未找到该群,请确认群聊uid是否正确"<<endl;
+        return;
+    }
 }
 

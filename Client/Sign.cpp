@@ -41,7 +41,7 @@ void Func_menu();
 //信号处理函数
 void setup()
 {
-    signal(SIGINT,SIG_IGN);//忽略ctrl+c信号
+    //signal(SIGINT,SIG_IGN);//忽略ctrl+c信号
     signal(SIGQUIT,SIG_IGN);//忽略ctrl+d信号
 }
 
@@ -126,8 +126,8 @@ int Login()
             exit(0);
 
         }else{
-            cout<<"输入错误,请重新输入:"<<endl;
-            continue;
+            cout<<"输入错误,请重新输入"<<endl;
+            //continue;
         }
     }
 
