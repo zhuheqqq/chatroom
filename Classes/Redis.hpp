@@ -92,7 +92,7 @@ public:
 }
 
 //创建好友列表以及往好友列表里添加好友
-void addFriendToFriendList(const string& userID, const string& friendID, const string& friendInfo) {
+/*void addFriendToFriendList(const string& userID, const string& friendID, const string& friendInfo) {
     string friendListKey = userID + "的好友列表";
 
     // 使用 HSETNX 命令将好友信息添加到用户的好友列表哈希表中
@@ -121,7 +121,7 @@ void addToBlockedList(const string& userID, const string& blockedID) {
     if (reply) {
         freeReplyObject(reply);
     }
-}
+}*/
 
 
 //获得列表里的键的数量
@@ -218,6 +218,18 @@ bool hexists(const string& key, const string& field) {
         }
         return false; // 返回 false 表示插入失败
     }
+
+    string lindexValue(const string& key, int index) {
+    // 使用 LINDEX 命令获取列表中指定索引的元素
+    redisReply* reply = (redisReply*)redisCommand(context, "LINDEX %s %d", key.c_str(), index);
+    if (reply != nullptr && reply->type == REDIS_REPLY_STRING) {
+        string value = reply->str;
+        freeReplyObject(reply);
+        return value;
+    }
+    return ""; // 返回空字符串表示获取失败
+}
+
 
 
 private:

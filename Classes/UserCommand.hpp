@@ -21,7 +21,7 @@ public:
     string m_uid;//用户ID，默认为空字符串
     string m_recvuid;//接收者的uid
     string m_nickname;//用户昵称
-    int m_flag=0;//用户发送操作者的类别
+    int m_flag;//用户发送操作者的类别
     vector<string> m_option;//命令的具体内容，动态数组
 
     void From_Json(string js)//从Json字符串中解析数据并填充到UserCommand结构体中
