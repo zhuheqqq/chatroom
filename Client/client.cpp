@@ -5,8 +5,8 @@
 #include "../Classes/UserCommand.hpp"
 #include "../Server/option.hpp"
  
- extern TcpSocket mysocket;
- UserCommand Curcommand;
+extern TcpSocket mysocket;
+UserCommand Curcommand;
 
 void Log_out();//注销函数
 int FriendManage();//好友管理函数
@@ -20,6 +20,7 @@ int Block_Friend();//屏蔽好友
 int Restore_Friend();//恢复好友会话
 int View_OnlineStatus();//查看好友在线状态
 int ChatWithFriend();//聊天
+void UnreadMessage();//查看未读消息
 
 
 
@@ -80,8 +81,8 @@ int main()
 
 int FriendManage()
 {
-    while(1)
-    {
+    //while(1)
+    //{
         Friend_menu();
         int option;
 
@@ -128,12 +129,15 @@ int FriendManage()
             case 9:
                 ChatWithFriend();
                 break;
+            case 10:
+                UnreadMessage();
+                break;
             default:
             system("clear");
-                cout<<"输入错误,请重新输入："<<endl;
-                continue;
+                cout<<"输入错误,请重新输入"<<endl;
+                //continue;
         }
-    }
+    //}
     
     return 0;
 }
@@ -213,15 +217,10 @@ int FriendList()
         exit(0);
     }
 
-    while (1)
+     string Friend;
+    while ((Friend = mysocket.RecvMsg()) != "end")
     {
-        string Friend = mysocket.RecvMsg();
-        if (Friend == "end")
-        {
-            cout << "好友列表展示完毕" << endl;
-            break;
-        }
-        else if (Friend == "none")
+        if (Friend == "none")
         {
             cout << "您当前还没有好友" << endl;
             return 0;
@@ -236,6 +235,8 @@ int FriendList()
             cout << Friend << endl;
         }
     }
+
+    cout << "好友列表展示完毕" << endl;
 
     return 1;
 }
@@ -397,6 +398,7 @@ int RefuseAddFriend()
         cout<<"已拒绝"<<Curcommand.m_uid<<"的好友申请"<<endl;
         return 1;
     }else{
+        cout<<recv<<endl;
         cout<<"其他错误"<<endl;
         return 0;
     }
@@ -434,6 +436,7 @@ int Block_Friend()//屏蔽好友
     {
         system("clear");
         cout<<"您已屏蔽过该好友,无需重复操作"<<endl;
+        return 0;
     }else
     {
         cout<<"其他错误"<<endl;
@@ -517,5 +520,29 @@ int ChatWithFriend()
 
 }
 
+void UnreadMessage()
+{
+    UserCommand command1(Curcommand.m_uid,Curcommand.m_nickname,"",UNREADMESSAGE,{""});//展示未读消息
+    int ret = mysocket.SendMsg(command1.To_Json());
+    if (ret == 0||ret == -1)
+    {
+        cout << "服务器端已关闭" << endl;
+        exit(0);
+    }
 
+    string recv=mysocket.RecvMsg();
+    if(recv=="close")
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }else if(recv=="no")
+    {
+        cout<<"您暂时还没有未读消息"<<endl;
+        return;
+    }else
+    {
+        cout<<recv<<endl;
+    }
+    
+}
 
