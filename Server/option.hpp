@@ -3,7 +3,7 @@
 #define SIGNUP 1
 #define LOGIN 2
 #define LOGOUT 3
-#define FRIENDLIST 0
+#define FRIENDLIST 0//隐藏bug除了0都不行
 #define ADDFRIEND 5
 #define DELETEFRIEND 6
 #define AGREEADDFRIEND 7
