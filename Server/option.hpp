@@ -1,8 +1,9 @@
 #pragma once
+//#define FRIENDLIST 0
 #define SIGNUP 1
 #define LOGIN 2
 #define LOGOUT 3
-#define FRIENDLIST 4
+#define FRIENDLIST 0
 #define ADDFRIEND 5
 #define DELETEFRIEND 6
 #define AGREEADDFRIEND 7
@@ -10,6 +11,7 @@
 #define BLOCKFRIEND 9
 #define RESTOREFRIEND 10
 #define VIEWONLINESTATUS 11
+#define UNREADMESSAGE 12
 
 
 // ANSI 转义码设置文本颜色

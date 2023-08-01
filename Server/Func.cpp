@@ -12,7 +12,8 @@
 
 using namespace std;
 Redis redis;
-//TcpSocket mysocket;
+extern TcpSocket mysocket;
+extern UserCommand Curcommand;
 
 struct Argc_func{
 public:
@@ -31,6 +32,7 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command);
 void RefuseAddFriend(TcpSocket mysocket,UserCommand command);
 void Block_Friend(TcpSocket mysocket,UserCommand command);
 void Restore_Friend(TcpSocket mysocket,UserCommand command);
+void UnreadMessage(TcpSocket mysocket,UserCommand command);
 
 void task(void *arg)
 {
@@ -62,13 +64,16 @@ void task(void *arg)
             AgreeAddFriend(mysocket,command);
             break;
         case BLOCKFRIEND:
-            RefuseAddFriend(mysocket,command);
+            Block_Friend(mysocket,command);
             break;
         case REFUSEADDFRIEND:
-            Block_Friend(mysocket,command);
+            RefuseAddFriend(mysocket,command);
             break;
         case RESTOREFRIEND:
             Restore_Friend(mysocket,command);
+            break;
+        case UNREADMESSAGE:
+            UnreadMessage(mysocket,command);
             break;
     }
 
@@ -167,7 +172,9 @@ void Log_out(TcpSocket mysocket,UserCommand command)//功能已实现
 void FriendList(TcpSocket mysocket,UserCommand command)
 {
     // 好友数量不为0，就遍历好友列表，根据在线状态发送要展示的内容
+    
     vector<string> friendList = redis.getFriendList(command.m_uid,"的好友列表");
+    
 
     for (const string& friendID : friendList) {
         string friendMark = redis.gethash(command.m_uid, friendID);
@@ -176,9 +183,9 @@ void FriendList(TcpSocket mysocket,UserCommand command)
 
         if (!redis.sismember(command.m_uid + "的屏蔽列表", friendID)) {
             if (isOnline != "-1") {
-                mysocket.SendMsg(L_GREEN + friendMark + NONE + "(" + friendID + ")");
-            } else {
                 mysocket.SendMsg(L_WHITE + friendMark + NONE + "(" + friendID + ")");
+            } else {
+                mysocket.SendMsg(L_GREEN + friendMark + NONE + "(" + friendID + ")");
             }
         }
     }
@@ -277,7 +284,7 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
         redis.hsetValue(command.m_uid + "的未读消息", "好友申请", (to_string(stoi(nownum) - 1)));
         //完善同意者信息
         string nickname=redis.gethash(command.m_option[0],"昵称");
-        cout<<nickname<<endl;
+        //cout<<nickname<<endl;
         redis.hsetValue(command.m_uid+"的好友列表",command.m_option[0],nickname);
         redis.lpushValue(command.m_uid+"---"+command.m_option[0],"-------------------");
 
@@ -307,8 +314,11 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
         mysocket.SendMsg("nofind");
         return;
     }
+    //为什么不能正常进if语句
+    //对不起我有病，我把宏定义的函数搞反了
     if(redis.removeMember(command.m_uid+"收到的好友申请",command.m_option[0]))
     {
+        cout<<"1"<<endl;
         //拒绝者未读消息好友申请
         string nownum = redis.gethash(command.m_uid + "的未读消息", "好友申请");
         redis.hsetValue(command.m_uid + "的未读消息", "好友申请", (to_string(stoi(nownum) - 1)));
@@ -322,6 +332,7 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
 
         mysocket.SendMsg("ok");
     }
+    
 
 }
 
@@ -332,39 +343,91 @@ void Block_Friend(TcpSocket mysocket,UserCommand command)
         mysocket.SendMsg("none");//不存在该好友
         return;
     }
-    //如果好友已经被屏蔽
-    int num=redis.getListCount(command.m_uid,"的屏蔽列表");//屏蔽列表中好友的数量
-    if(num!=0)
-    {
-        vector<string> blocklist=redis.getFriendList(command.m_uid,"的屏蔽列表");
+    // 使用 Redis Set 的 SADD 命令将好友添加到屏蔽列表中
+    bool success = redis.saddvalue(command.m_uid + "的屏蔽列表", command.m_option[0]);
 
-        auto it=find(blocklist.begin(),blocklist.end(),command.m_option[0]);
-        if(it!=blocklist.end())
-        {
-            mysocket.SendMsg("handled");
-        }
-    }else{//正常屏蔽好友
-        redis.addToBlockedList(command.m_uid,command.m_option[0]);
-        mysocket.SendMsg("ok");
-        return;
+    if (success)
+    {
+        mysocket.SendMsg("ok"); // 屏蔽成功
+    }
+    else
+    {
+        mysocket.SendMsg("handled"); // 已屏蔽过该好友
     }
 }
 
 void Restore_Friend(TcpSocket mysocket,UserCommand command)
 {
-    if(!redis.hexists(command.m_uid+"的屏蔽列表",command.m_option[0]))
+     // 使用 Redis Set 的 SISMEMBER 命令检查好友是否在用户的屏蔽列表中
+    bool isBlocked = redis.sismember(command.m_uid + "的屏蔽列表", command.m_option[0]);
+
+    if (!isBlocked)
     {
-        mysocket.SendMsg("no");//该好友未被屏蔽
-        return;
-    }else if(!redis.hexists(command.m_uid+"的好友列表",command.m_option[0]))
-    {
-        mysocket.SendMsg("none");//不存在该好友
-        return;
-    }else{
-        redis.removeMember(command.m_uid+"的屏蔽列表",command.m_option[0]);//好友成功解除屏蔽
-        mysocket.SendMsg("ok");
+        mysocket.SendMsg("no"); // 该好友未被屏蔽
         return;
     }
+
+    // 使用 Redis Hash 的 HEXISTS 命令检查好友是否存在于用户的好友列表中
+    bool isFriend = redis.hexists(command.m_uid + "的好友列表", command.m_option[0]);
+
+    if (!isFriend)
+    {
+        mysocket.SendMsg("none"); // 不存在该好友
+        return;
+    }
+
+    // 使用 Redis Set 的 SREM 命令将好友从屏蔽列表中移除
+    bool success = redis.sremValue(command.m_uid + "的屏蔽列表", command.m_option[0]);
+
+    if (success)
+    {
+        mysocket.SendMsg("ok"); // 好友成功解除屏蔽
+    }
+    else
+    {
+        mysocket.SendMsg("error"); // 解除屏蔽失败
+    }
+    return;
+}
+
+void UnreadMessage(TcpSocket mysocket,UserCommand command)
+{
+    string response;
+    int num=stoi(redis.gethash(command.m_uid+"的未读消息","通知消息"));
+    int num1=stoi(redis.gethash(command.m_uid+"的未读消息","好友申请"));
+    int num2=num+num1;
+    if(num2==0)
+    {
+        mysocket.SendMsg("no");
+    }else{
+        response="您有"+to_string(num2)+"条未读消息:\n";
+
+        //获取通知消息具体内容
+        for(int i=0;i<num;++i)
+        {
+            string notify=command.m_uid+"的通知消息";
+            string notification=redis.lindexValue(notify,i);
+            response+="通知"+to_string(i+1)+":"+notification+"\n";
+        }
+
+        //获取好友申请的具体内容
+        for(int i=0;i<num1;++i)
+        {
+            string friendRequestKey=command.m_uid+"收到的好友申请";
+            string field=to_string(i);
+            string friendRequest=redis.gethash(friendRequest,field);
+            response+="好友申请"+to_string(i+1)+":"+friendRequest+"\n";
+        }
+    }
+
+    response+="请尽快处理\n";
+
+    mysocket.SendMsg(response);
+
+    // 删除通知消息
+    redis.delKey(command.m_uid + "的通知消息");
+    // 清零未读消息的通知消息
+    redis.hsetValue(command.m_uid + "的未读消息", "通知消息", "0");
 }
 
 int main()
