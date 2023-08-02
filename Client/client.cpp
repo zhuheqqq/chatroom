@@ -582,6 +582,25 @@ int ChatWithFriend()
                 //退出聊天
                 break;
             }
+
+            //包装消息
+            UserCommand command_msg(Curcommand.m_uid,"",recvuid,CHATWITHFRIEND,{newmsg});
+            int ret = mysocket.SendMsg(command_msg.To_Json());
+            if (ret == 0||ret == -1)
+            {
+                cout << "服务器端已关闭" << endl;
+                exit(0);
+            }
+
+            string recv=mysocket.RecvMsg();
+            if(recv=="close")
+            {
+                cout<<"服务器端已关闭"<<endl;
+                exit(0);
+            }else if(recv=="ok")
+            {
+                
+            }
         }
     }
 
@@ -613,7 +632,7 @@ void UnreadMessage()
     
 }
 
-/*void AddGroup()
+void AddGroup()
 {
     string groupuid;//群聊的uid
     cout<<"您想加入的群聊的uid为:"<<endl;
@@ -644,5 +663,5 @@ void UnreadMessage()
         cout<<"未找到该群,请确认群聊uid是否正确"<<endl;
         return;
     }
-}*/
+}
 
