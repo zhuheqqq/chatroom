@@ -91,39 +91,6 @@ public:
     }
 }
 
-//创建好友列表以及往好友列表里添加好友
-/*void addFriendToFriendList(const string& userID, const string& friendID, const string& friendInfo) {
-    string friendListKey = userID + "的好友列表";
-
-    // 使用 HSETNX 命令将好友信息添加到用户的好友列表哈希表中
-    redisReply* reply = (redisReply*)redisCommand(context, "HSETNX %s %s %s", friendListKey.c_str(), friendID.c_str(), friendInfo.c_str());
-    if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER && reply->integer == 1) {
-        cout << "成功将用户 " << friendID << " 添加为好友！" << endl;
-    } else {
-        cout << "用户 " << friendID << " 已是好友，无需重复添加！" << endl;
-    }
-    if (reply) {
-        freeReplyObject(reply);
-    }
-}
-
-//创建屏蔽列表并往屏蔽列表里添加好友
-void addToBlockedList(const string& userID, const string& blockedID) {
-    string blockedListKey = userID + "的屏蔽列表";
-
-    // 使用 HSETNX 命令将屏蔽信息添加到用户的屏蔽列表哈希表中
-    redisReply* reply = (redisReply*)redisCommand(context, "HSETNX %s %s", blockedListKey.c_str(), blockedID.c_str());
-    if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER && reply->integer == 1) {
-        cout << "成功将用户 " << blockedID << " 加入屏蔽列表！" << endl;
-    } else {
-        cout << "用户 " << blockedID << " 已在屏蔽列表中，无需重复添加！" << endl;
-    }
-    if (reply) {
-        freeReplyObject(reply);
-    }
-}*/
-
-
 //获得列表里的键的数量
  int getListCount(const string& userID, const string& listType) {
         string listKey = userID + listType;
@@ -142,6 +109,7 @@ void addToBlockedList(const string& userID, const string& blockedID) {
     }
 
 //获取指定的好友列表或者屏蔽列表
+//获取哈希字段名
 vector<string> getFriendList(const string& userID,const string& listType) {
     string friendListKey = userID + listType;
     vector<string> friendList;
@@ -230,6 +198,19 @@ bool hexists(const string& key, const string& field) {
     return ""; // 返回空字符串表示获取失败
 }
 
+vector<string> smembers(const string& key) {
+    vector<string> members;
+
+    // 发送 SMEMBERS 命令到 Redis 并存储回复。
+    redisReply* reply = (redisReply*)redisCommand(context, "SMEMBERS %s", key.c_str());
+    if (reply != nullptr && reply->type == REDIS_REPLY_ARRAY) {
+        for (size_t i = 0; i < reply->elements; ++i) {
+            members.push_back(reply->element[i]->str);
+        }
+        freeReplyObject(reply);
+    }
+    return members;
+}
 
 
 private:
