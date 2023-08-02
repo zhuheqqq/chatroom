@@ -39,8 +39,8 @@ void Restore_Friend(TcpSocket mysocket,UserCommand command);//恢复会话
 void ViewOnlineStatus(TcpSocket mysocket,UserCommand command);//查看好友在线状态
 void UnreadMessage(TcpSocket mysocket,UserCommand command);//未读消息
 void ChatWithFriend(TcpSocket mysocket,UserCommand command);//私聊
-//void AddGroup(TcpSocket mysocket,UserCommand command);//加群
-//void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
+void AddGroup(TcpSocket mysocket,UserCommand command);//加群
+void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
 
 void task(void *arg)
 {
@@ -83,7 +83,7 @@ void task(void *arg)
         case UNREADMESSAGE:
             UnreadMessage(mysocket,command);
             break;
-        /*case CHATWITHFRIEND:
+        case CHATWITHFRIEND:
             ChatWithFriend(mysocket,command);
             break;
         case ADDGROUP:
@@ -91,7 +91,7 @@ void task(void *arg)
             break;
         case CREATEGROUP:
             CreateGroup(mysocket,command);
-            break;*/
+            break;
     }
 
     return;
@@ -449,9 +449,6 @@ void UnreadMessage(TcpSocket mysocket,UserCommand command)
 
 int main()
 {
-
-    // 设置SIGINT信号处理函数
-    //signal(SIGINT, signal_handler);
 
     int lfd=0,cfd=0,efd=0; 
     char *buf;
