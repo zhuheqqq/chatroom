@@ -9,15 +9,19 @@
 #include<random>
 #include<fcntl.h>
 #include<sys/epoll.h>
+#include <csignal>
+#include <unordered_set>
 
 using namespace std;
 Redis redis;
 extern TcpSocket mysocket;
 extern UserCommand Curcommand;
 
-struct Argc_func{
+struct Argc_func {
 public:
-    Argc_func(TcpSocket mysocket, string command_string) : mysocket(mysocket), command_string(command_string) {}
+    Argc_func(TcpSocket mysocket, string command_string)
+        : mysocket(mysocket), command_string(command_string){}
+
     TcpSocket mysocket;
     string command_string;
 };
@@ -32,10 +36,11 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command);//同意好友请求
 void RefuseAddFriend(TcpSocket mysocket,UserCommand command);//拒绝好友请求
 void Block_Friend(TcpSocket mysocket,UserCommand command);//屏蔽好友
 void Restore_Friend(TcpSocket mysocket,UserCommand command);//恢复会话
+void ViewOnlineStatus(TcpSocket mysocket,UserCommand command);//查看好友在线状态
 void UnreadMessage(TcpSocket mysocket,UserCommand command);//未读消息
 void ChatWithFriend(TcpSocket mysocket,UserCommand command);//私聊
-void AddGroup(TcpSocket mysocket,UserCommand command);//加群
-void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
+//void AddGroup(TcpSocket mysocket,UserCommand command);//加群
+//void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
 
 void task(void *arg)
 {
@@ -72,13 +77,13 @@ void task(void *arg)
         case REFUSEADDFRIEND:
             RefuseAddFriend(mysocket,command);
             break;
-        case RESTOREFRIEND:
-            Restore_Friend(mysocket,command);
+        case VIEWONLINESTATUS:
+            ViewOnlineStatus(mysocket,command);
             break;
         case UNREADMESSAGE:
             UnreadMessage(mysocket,command);
             break;
-        case CHATWITHFRIEND:
+        /*case CHATWITHFRIEND:
             ChatWithFriend(mysocket,command);
             break;
         case ADDGROUP:
@@ -86,7 +91,7 @@ void task(void *arg)
             break;
         case CREATEGROUP:
             CreateGroup(mysocket,command);
-            break;
+            break;*/
     }
 
     return;
@@ -113,13 +118,14 @@ void Sign_up(TcpSocket mysocket,UserCommand command)//注册选项
             redis.hsetValue(uid, "账号", uid);
             redis.hsetValue(uid, "昵称", command.m_nickname);
             redis.hsetValue(uid, "密码", command.m_option[0]);
-            redis.hsetValue(uid, "在线状态", "-1");
+            //redis.hsetValue(uid, "在线状态", "-1");
             redis.hsetValue(uid, "性别", "未知");
             redis.hsetValue(uid, "其他信息", "无");
             redis.hsetValue(uid, "通知套接字", "-1");
             redis.hsetValue(uid, "聊天对象", "无");
             redis.hsetValue(uid + "的未读消息", "通知消息", "0");
             redis.hsetValue(uid + "的未读消息", "好友申请", "0");
+           
 
             mysocket.SendMsg(uid);
             cout<<"用户"<<uid<<"注册成功"<<endl;
@@ -140,12 +146,13 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
         {
             mysocket.SendMsg("discorrect");
 
-        }else{
+        }else{ 
+            redis.saddvalue("在线用户列表",command.m_uid);
             //密码正确，可以登陆改变其在线状态
-            redis.hsetValue(command.m_uid,"在线状态",to_string(mysocket.getfd()));
+            //redis.hsetValue(command.m_uid,"在线状态",to_string(mysocket.getfd()));
             redis.hsetValue("fd-uid表",to_string(mysocket.getfd()),command.m_uid);
             redis.hsetValue(command.m_uid,"聊天对象","0");
-           // redis.hsetValue(command.m_uid,"通知套接字","-1");
+            redis.hsetValue(command.m_uid,"通知套接字","-1");
            mysocket.SendMsg("ok");
            cout<<"用户"<<command.m_uid<<"登陆成功"<<endl;
         }
@@ -182,7 +189,7 @@ void Log_out(TcpSocket mysocket,UserCommand command)//功能已实现
 }
 
 
-//没有实现//已实现
+//已实现
 //如果好友列表可以展示在线状态，那么就没有必要有查看好友在线状态的选项
 void FriendList(TcpSocket mysocket,UserCommand command)
 {
@@ -192,15 +199,11 @@ void FriendList(TcpSocket mysocket,UserCommand command)
     
 
     for (const string& friendID : friendList) {
-        string friendMark = redis.gethash(command.m_uid, friendID);
-        //考虑TCP心跳监测
-        string isOnline = redis.gethash(friendID, "在线状态");//无法获取实时的在线状态需要修改*/
-
         if (!redis.sismember(command.m_uid + "的屏蔽列表", friendID)) {
-            if (isOnline != "-1") {
-                mysocket.SendMsg(L_WHITE + friendMark + NONE + "(" + friendID + ")");
+            if (redis.sismember("在线用户列表",friendID)) {
+                mysocket.SendMsg(friendID);
             } else {
-                mysocket.SendMsg(L_GREEN + friendMark + NONE + "(" + friendID + ")");
+                mysocket.SendMsg("(" + friendID + ")");
             }
         }
     }
@@ -389,6 +392,22 @@ void Restore_Friend(TcpSocket mysocket,UserCommand command)
     return;
 }
 
+void ViewOnlineStatus(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_uid+"的好友列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }else if(!redis.sismember("在线用户列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("no");
+        return;
+    }else{
+        mysocket.SendMsg("ok");
+        return;
+    }
+}
+
 void UnreadMessage(TcpSocket mysocket,UserCommand command)
 {
     string response;
@@ -410,12 +429,11 @@ void UnreadMessage(TcpSocket mysocket,UserCommand command)
         }
 
         //获取好友申请的具体内容
-        for(int i=0;i<num1;++i)
-        {
-            string friendRequestKey=command.m_uid+"收到的好友申请";
-            string field=to_string(i);
-            string friendRequest=redis.gethash(friendRequest,field);
-            response+="好友申请"+to_string(i+1)+":"+friendRequest+"\n";
+        vector<string> fieldNames = redis.getFriendList(command.m_uid,"收到的好友申请");
+        for (size_t i = 0; i < fieldNames.size(); ++i) {
+            // 使用字段名获取好友申请的具体内容
+            string friendRequest = redis.gethash(command.m_uid + "收到的好友申请", fieldNames[i]);
+            response += "好友申请" + to_string(i + 1) + ":" + friendRequest + "\n";
         }
     }
 
@@ -431,6 +449,9 @@ void UnreadMessage(TcpSocket mysocket,UserCommand command)
 
 int main()
 {
+
+    // 设置SIGINT信号处理函数
+    //signal(SIGINT, signal_handler);
 
     int lfd=0,cfd=0,efd=0; 
     char *buf;
@@ -504,6 +525,8 @@ int main()
                 if(ret<=0)
                 {
                     cerr<<"error receiving data ."<<endl;
+                    string uid =redis.gethash("fd-uid表",to_string(curfd)); // 获取客户端的用户ID
+                    redis.sremValue("在线用户列表",uid);
                     close(curfd);
                     continue;
                 }
@@ -517,7 +540,7 @@ int main()
                 task(&argc_func);
             }
         }
-
-    }  
+        
+    } 
     
 }
