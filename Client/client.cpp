@@ -1,5 +1,6 @@
 #include "Menu.hpp"
 #include "Sign.cpp"
+#include<chrono>
 #include "../Server/wrap.hpp"
 #include "../Classes/TcpSocket.hpp"
 #include "../Classes/UserCommand.hpp"
@@ -21,14 +22,14 @@ int Restore_Friend();//恢复好友会话
 int View_OnlineStatus();//查看好友在线状态
 int ChatWithFriend();//聊天
 void UnreadMessage();//查看未读消息
-void AddGroup();//添加群聊
-void CreateGroup();//创建群聊
-
-
+//void AddGroup();//添加群聊
+//void CreateGroup();//创建群聊
 
 int main()
 {
     //UserCommand Curcommand;
+
+    int timeoutSeconds = 5; // 设置心跳间隔为5秒
 
     mysocket.ConnectToHost("127.0.0.1", 9999);
 
@@ -128,9 +129,9 @@ int FriendManage()
             case 8:
                 View_OnlineStatus();
                 break;
-            case 9:
+            /*case 9:
                 ChatWithFriend();
-                break;
+                break;*/
             case 10:
                 UnreadMessage();
                 break;
@@ -171,12 +172,12 @@ int GroupManage()
         }else if(option==2)
         {
             //创建群聊
-            CreateGroup();
+            //CreateGroup();
             break;
         }else if(option==3)
         {
             //添加群聊
-            AddGroup();
+            //AddGroup();
             break;
         }else{
             system("clear");
@@ -240,7 +241,7 @@ int FriendList()
         }
     }
 
-    cout << "好友列表展示完毕" << endl;
+    cout << "好友列表展示完毕,带括号表示好友不在线" << endl;
 
     return 1;
 }
@@ -488,7 +489,7 @@ int Restore_Friend()
 
 int View_OnlineStatus()//没有实现
 {
-    string viewuid;//屏蔽好友
+    string viewuid;
     cout<<"您想查看在线状态的好友uid为:"<<endl;
     cin>>viewuid;
 
@@ -505,13 +506,17 @@ int View_OnlineStatus()//没有实现
     {
         cout<<"服务器端已关闭"<<endl;
         exit(0);
+    }else if(recv=="none")
+    {
+        cout<<"该用户不是您的好友"<<endl;
+        return 0;
     }else if(recv=="ok")
     {
-        cout<<"用户"<<Curcommand.m_uid<<"现在在线,快去找ta聊天吧"<<endl;
+        cout<<"用户"<<viewuid<<"现在在线,快去找ta聊天吧"<<endl;
         return 1;
     }else if(recv=="no")
     {
-        cout<<"用户"<<Curcommand.m_uid<<"现在不在线,有事请留言"<<endl;
+        cout<<"用户"<<viewuid<<"现在不在线,有事请留言"<<endl;
         return 1;
     }else{
         cout<<"其他错误"<<endl;
@@ -532,6 +537,52 @@ int ChatWithFriend()
     {
         cout << "服务器端已关闭" << endl;
         exit(0);
+    }
+
+    string recv=mysocket.RecvMsg();
+    if(recv=="close")
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }/*else if(recv=="none")
+    {
+        cout<<"您还没有好友,请先添加好友"<<endl;
+        return 0;
+    }*/else if(recv=="nofind")
+    {
+        cout<<"在好友列表中没有找到该好友"<<endl;
+        return 0;
+    }else if(recv=="ok")
+    {
+        //成功与好友建立联系，打印历史聊天记录
+        string historymsg;
+        while(1)
+        {
+            historymsg=mysocket.RecvMsg();
+            if(historymsg=="close")
+            {
+                cout<<"服务器端已关闭"<<endl;
+                exit(0);
+            }else if(historymsg=="历史聊天记录展示完毕")
+            {
+                break;
+            }else{
+                cout<<historymsg<<endl;
+            }
+        }
+
+        //获取新的聊天会话
+        string newmsg;
+        while(1)
+        {
+            cin.ignore();//忽略当前缓冲区中的内容
+            getline(cin,newmsg);
+            if(newmsg=="exit")//代表用户想退出聊天
+            {
+                //退出聊天
+                break;
+            }
+        }
     }
 
 }
@@ -562,7 +613,7 @@ void UnreadMessage()
     
 }
 
-void AddGroup()
+/*void AddGroup()
 {
     string groupuid;//群聊的uid
     cout<<"您想加入的群聊的uid为:"<<endl;
@@ -593,5 +644,5 @@ void AddGroup()
         cout<<"未找到该群,请确认群聊uid是否正确"<<endl;
         return;
     }
-}
+}*/
 
