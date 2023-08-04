@@ -590,12 +590,13 @@ int ChatWithFriend()
         string newmsg;
         while(1)
         {
-            cin.ignore();//忽略当前缓冲区中的内容
+            //cin.ignore();//忽略当前缓冲区中的内容
+            //cin.sync();
             getline(cin,newmsg);
             if(newmsg=="exit")//代表用户想退出聊天
             {
                 //退出聊天
-                UserCommand command_exit(Curcommand.m_uid,"","",EXITCHAT,{""});
+                UserCommand command_exit(Curcommand.m_uid,"",recvuid,EXITCHAT,{""});
                 int ret=mysocket.SendMsg(command_exit.To_Json());
                 if (ret == 0||ret == -1)
                 {
