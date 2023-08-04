@@ -15,7 +15,7 @@ public:
     TcpSocket(string msg);
     ~TcpSocket();
     int getfd(){return m_fd;}
-    //int getresvfd(){return recv_fd;}
+    int getresvfd(){return recv_fd;}
     int ConnectToHost(string ip,unsigned short port);
     int SendMsg(string msg);
     string RecvMsg();
@@ -26,5 +26,5 @@ public:
 
 private:
     int m_fd=-1;//向服务器发送消息
-    //int recv_fd=-1;//接收服务器发送的消息
+    int recv_fd=-1;//接收服务器发送的消息
 };

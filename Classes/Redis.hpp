@@ -198,20 +198,28 @@ bool hexists(const string& key, const string& field) {
     return ""; // 返回空字符串表示获取失败
 }
 
-vector<string> smembers(const string& key) {
-    vector<string> members;
+// 获取列表中的所有元素
+    vector<string> lrangeAll(const std::string& key) {
+        vector<string> result;
 
-    // 发送 SMEMBERS 命令到 Redis 并存储回复。
-    redisReply* reply = (redisReply*)redisCommand(context, "SMEMBERS %s", key.c_str());
-    if (reply != nullptr && reply->type == REDIS_REPLY_ARRAY) {
-        for (size_t i = 0; i < reply->elements; ++i) {
-            members.push_back(reply->element[i]->str);
+        // 使用 Redis 的 LRANGE 命令获取列表所有元素
+        redisReply* reply = (redisReply*)redisCommand(context, "LRANGE %s 0 -1", key.c_str());
+        if (reply == nullptr) {
+            cerr << "Error: Failed to execute LRANGE command for key: " << key << endl;
+            return result;
         }
-        freeReplyObject(reply);
-    }
-    return members;
-}
 
+        if (reply->type == REDIS_REPLY_ARRAY) {
+            for (size_t i = 0; i < reply->elements; ++i) {
+                if (reply->element[i]->type == REDIS_REPLY_STRING) {
+                    result.push_back(reply->element[i]->str);
+                }
+            }
+        }
+
+        freeReplyObject(reply);
+        return result;
+    }
 
 private:
     redisContext* context; // 指向Redis连接的上下文指针。

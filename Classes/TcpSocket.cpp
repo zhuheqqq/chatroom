@@ -11,14 +11,15 @@ TcpSocket::TcpSocket(int fd):m_fd(fd)//要用初始化列表不能在函数体�
 {
 }
 
-// TcpSocket::TcpSocket(string msg)
-// {
-//     if(msg=="recv")
-//     {
-//         fd=Socket(AF_INET,SOCK_STREAM,0);
-//         recv_fd=Socket(AF_INET,SOCK_STREAM,0);
-//     }
-// }
+ TcpSocket::TcpSocket(string msg)
+ {
+    if(msg=="recv")
+    {
+        m_fd=Socket(AF_INET,SOCK_STREAM,0);
+        recv_fd=Socket(AF_INET,SOCK_STREAM,0);    
+        
+    }
+}
 
 TcpSocket::~TcpSocket(){}//析构函数
 
