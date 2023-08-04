@@ -266,7 +266,7 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
         //cout<<"1"<<endl;
         string friend_fd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket friendsocket(stoi(friend_fd));
-        friendsocket.SendMsg("来自"+command.m_uid+"的好友申请");
+        friendsocket.SendMsg("您收到来自"+command.m_uid+"的好友申请");
     }
 
     mysocket.SendMsg("ok");
@@ -513,7 +513,7 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
     //展示消息
     string my_recvfd=redis.gethash(command.m_uid,"通知套接字");
     TcpSocket my_socket(stoi(my_recvfd));
-    my_socket.SendMsg(L_GREEN+newmsg);
+    my_socket.SendMsg(L_GREEN+newmsg+NONE);
 
 
     //没有被好友屏蔽
@@ -523,19 +523,19 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
         return;
         
     }
-    string nickname=command.m_nickname;
-    string msg1=nickname+":"+command.m_option[0];
+    string uid=command.m_uid;
+    string msg1=uid+":"+command.m_option[0];
     redis.lpushValue(command.m_recvuid+"和"+command.m_uid+"的聊天记录",msg1);
     
 
     //好友此时在线并且在和我聊天
-    if(redis.hexists("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
+    if(redis.sismember("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
     {
-        string fr_recvfd=redis.gethash(command.m_uid,"通知套接字");
+        string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket fr_socket(stoi(fr_recvfd));
         fr_socket.SendMsg(L_WHITE+msg1);
 
-    }else if(!redis.hexists("在线用户列表",command.m_recvuid))//好友不在线
+    }else if(!redis.sismember("在线用户列表",command.m_recvuid))//好友不在线
     {
         string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
         redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
@@ -556,6 +556,7 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
 void ExitChat(TcpSocket mysocket,UserCommand command)
 {
     redis.hsetValue(command.m_uid,"聊天对象","0");
+    redis.hsetValue(command.m_recvuid,"聊天对象","0");
     mysocket.SendMsg("ok");
     return ;
 }
@@ -626,8 +627,8 @@ int main()
                     exit(0);
                 }
 
-                redis.hsetValue("fd-uid表",to_string(curfd),"-1");
-                cout<<"客户端连接成功，套接字为:"<<curfd<<endl;
+                //redis.hsetValue("fd-uid表",to_string(curfd),"-1");
+                //cout<<"客户端连接成功，套接字为:"<<curfd<<endl;
             }else{
 
                 TcpSocket mysocket(curfd);
@@ -661,7 +662,7 @@ int main()
                 if(command.m_flag==RECV)
                 {
                     redis.hsetValue(command.m_uid, "通知套接字", to_string(curfd));
-                    redis.hsetValue("fd-uid表", to_string(curfd), command.m_uid+"(通)");
+                    //redis.hsetValue("fd-uid表", to_string(curfd), command.m_uid+"(通)");
                 }else{
                     Argc_func argc_func(TcpSocket(curfd),command_string);
                     task(&argc_func);
