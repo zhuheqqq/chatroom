@@ -9,6 +9,8 @@
 extern TcpSocket mysocket;
 UserCommand Curcommand;
 
+
+void *recvfunc(void *arg);//线程处理函数
 void Log_out();//注销函数
 int FriendManage();//好友管理函数
 int GroupManage();//群聊管理函数
@@ -29,7 +31,6 @@ int main()
 {
     //UserCommand Curcommand;
 
-    int timeoutSeconds = 5; // 设置心跳间隔为5秒
 
     mysocket.ConnectToHost("127.0.0.1", 9999);
 
@@ -84,8 +85,8 @@ int main()
 
 int FriendManage()
 {
-    //while(1)
-    //{
+    while(1)
+    {
         Friend_menu();
         int option;
 
@@ -103,44 +104,50 @@ int FriendManage()
         cin.clear(); // 清除输入流的错误状态
         cin.sync();  // 清空输入缓冲区
 
-        switch (option)
+        if(option!=11)
         {
-            case 1:
-                FriendList();
-                break;
-            case 2:
-                Add_Friend();
-                break;
-            case 3:
-                Delete_Friend();
-                break;
-            case 4:
-                AgreeAddFriend();
-                break;
-            case 5:
-                RefuseAddFriend();
-                break;
-            case 6:
-                Block_Friend();
-                break;
-            case 7:
-                Restore_Friend();
-                break;
-            case 8:
-                View_OnlineStatus();
-                break;
-            /*case 9:
-                ChatWithFriend();
-                break;*/
-            case 10:
-                UnreadMessage();
-                break;
-            default:
-            system("clear");
-                cout<<"输入错误,请重新输入"<<endl;
-                //continue;
+                switch (option)
+            {
+                case 1:
+                    FriendList();
+                    break;
+                case 2:
+                    Add_Friend();
+                    break;
+                case 3:
+                    Delete_Friend();
+                    break;
+                case 4:
+                    AgreeAddFriend();
+                    break;
+                case 5:
+                    RefuseAddFriend();
+                    break;
+                case 6:
+                    Block_Friend();
+                    break;
+                case 7:
+                    Restore_Friend();
+                    break;
+                case 8:
+                    View_OnlineStatus();
+                    break;
+                case 9:
+                    ChatWithFriend();
+                    break;
+                case 10:
+                    UnreadMessage();
+                    break;
+                default:
+                system("clear");
+                    cout<<"输入错误,请重新输入"<<endl;
+                    continue;
+            }
+        }else{
+            break;
         }
-    //}
+        
+    }
     
     return 0;
 }
@@ -273,20 +280,24 @@ int Add_Friend()
     }
     else if (recv == "ok")
     {
+        system("clear");
         cout << "好友添加申请已发送,等待对方通过" << endl;
         return 1;
     }
     else if (recv == "exist")
     {
+        system("clear");
         cout << "该用户已经是您的好友,无需反复添加" << endl;
         return 0;
     }else if(recv=="handle")
     {
+        system("clear");
         cout<<"您已经向该好友发送过好友申请,请耐心等待回复"<<endl;
         return 1;
     }
     else if (recv == "apply")
     {
+        system("clear");
         cout << "您的系统消息中存在对方发送的好友申请,请先回复" << endl;
         return 0;
     }
@@ -323,11 +334,13 @@ int Delete_Friend()
     }
     else if (recv == "ok")
     {
+        system("clear");
         cout << "您已成功删除该好友" << endl;
         return 1;
     }
     else if (recv == "none")
     {
+        //system("clear");
         cout << "未找到该好友" << endl;
         return 0;
     }else{
@@ -358,7 +371,8 @@ int AgreeAddFriend()
     }
     else if (recv == "ok")
     {
-        cout << "已通过" << Curcommand.m_uid << "的好友申请" << endl;
+        system("clear");
+        cout << "已通过" << agreeuid << "的好友申请" << endl;
         return 1;
     }else if(recv=="nofind")
     {
@@ -400,7 +414,8 @@ int RefuseAddFriend()
         return 1;
     }else if(recv=="ok")
     {
-        cout<<"已拒绝"<<Curcommand.m_uid<<"的好友申请"<<endl;
+        system("clear");
+        cout<<"已拒绝"<<refuseuid<<"的好友申请"<<endl;
         return 1;
     }else{
         cout<<recv<<endl;
@@ -580,11 +595,33 @@ int ChatWithFriend()
             if(newmsg=="exit")//代表用户想退出聊天
             {
                 //退出聊天
+                UserCommand command_exit(Curcommand.m_uid,"","",EXITCHAT,{""});
+                int ret=mysocket.SendMsg(command_exit.To_Json());
+                if (ret == 0||ret == -1)
+                {
+                    cout << "服务器端已关闭" << endl;
+                    exit(0);
+                }
+
+                string recv=mysocket.RecvMsg();
+                if(recv=="close")
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    exit(0);
+                }else if(recv=="ok")
+                {
+                    cout<<"已成功退出聊天"<<endl;
+                    return 1;
+                }else{
+                    cout<<"其他错误"<<endl;
+                    return 0;
+                }
+
                 break;
             }
 
             //包装消息
-            UserCommand command_msg(Curcommand.m_uid,"",recvuid,CHATWITHFRIEND,{newmsg});
+            UserCommand command_msg(Curcommand.m_uid,"",recvuid,SENDMSG,{newmsg});
             int ret = mysocket.SendMsg(command_msg.To_Json());
             if (ret == 0||ret == -1)
             {
@@ -599,7 +636,7 @@ int ChatWithFriend()
                 exit(0);
             }else if(recv=="ok")
             {
-                
+                continue;
             }
         }
     }

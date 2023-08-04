@@ -14,13 +14,12 @@
 
 using namespace std;
 extern UserCommand Curcommand;
-TcpSocket mysocket;
+TcpSocket mysocket("recv");
 
-struct RecvArg
-{
+struct RecvArg{
     string uid;
     int recv_fd=-1;
-    RecvArg(string myuid,int Recv_uid):uid(myuid),recv_fd(Recv_uid){}
+    RecvArg(string myuid,int recv_fd):uid(myuid),recv_fd(recv_fd){}
 };
 
 /*void *recvfunc(void *)
@@ -36,7 +35,42 @@ int Sign_up(TcpSocket mysocket);
 string get_uid();
 void Func_menu();
 
+void *recvfunc(void *arg)//线程处理函数
+{
+    RecvArg *recv_arg=static_cast<RecvArg*>(arg);//类型转换
+    TcpSocket recvsocket(recv_arg->recv_fd);
+    recvsocket.ConnectToHost("127.0.0.1",9999);
+    UserCommand command(recv_arg->uid,"","",RECV,{""});//表示接收实时通知
+    //cout<<"5"<<endl;
+    int ret=recvsocket.SendMsg(command.To_Json());
+    //cout<<"4"<<endl;
+    if(ret==-1||ret==0)
+    {
+        cout<<"服务器端已关闭"<<endl;
+        delete recv_arg;
+        exit(0);
+    }
+    //cout<<"3"<<endl;
 
+    while(1)//循环接收消息
+    {
+        //cout<<"2"<<endl;
+        string recv=recvsocket.RecvMsg();
+        if(recv=="close")
+        {
+            cout<<"服务器端已关闭"<<endl;
+            delete recv_arg;
+            exit(0);
+        }
+        //cout<<"1"<<endl;
+        // 使用 ANSI 转义序列将光标移动到终端最底部并输出消息
+        cout <<"\033[44m" << recv<<"\033[0m" << endl;
+        //cout<<"0"<<endl;
+
+    }
+
+    return nullptr;
+}
 
 //信号处理函数
 void setup()
@@ -233,13 +267,13 @@ int Log_in(TcpSocket mysocket)//登陆
     {
         system("clear");
         cout<<"登陆成功"<<endl;
+        pthread_t tid;
+        RecvArg *recv_arg=new RecvArg(uid,mysocket.getresvfd());
+        Pthread_create(&tid,NULL,&recvfunc,static_cast<void*>(recv_arg));//处理实时通知
+
+        ret=Pthread_detach(tid);
+
         return 1;
-
-        //pthread_t tid;
-       // Pthread_create(&tid,NULL,tfn,(void *)uid);//tfn功能为将用户uid添加到在线列表中
-
-        //放一个登陆成功之后进行下一步选择的函数
-        //Func_menu();//功能菜单函数
     }
 
    
