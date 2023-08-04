@@ -1,4 +1,5 @@
 #pragma once
+#define RECV -1
 //#define FRIENDLIST 0
 #define SIGNUP 1
 #define LOGIN 2
@@ -15,6 +16,8 @@
 #define UNREADMESSAGE 13
 #define ADDGROUP 14
 #define CREATEGROUP 15
+#define SENDMSG 16
+#define EXITCHAT 17
 
 
 // ANSI 转义码设置文本颜色

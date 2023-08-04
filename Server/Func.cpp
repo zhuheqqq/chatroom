@@ -14,7 +14,7 @@
 
 using namespace std;
 Redis redis;
-extern TcpSocket mysocket;
+//extern TcpSocket mysocket;
 extern UserCommand Curcommand;
 
 struct Argc_func {
@@ -38,9 +38,11 @@ void Block_Friend(TcpSocket mysocket,UserCommand command);//屏蔽好友
 void Restore_Friend(TcpSocket mysocket,UserCommand command);//恢复会话
 void ViewOnlineStatus(TcpSocket mysocket,UserCommand command);//查看好友在线状态
 void UnreadMessage(TcpSocket mysocket,UserCommand command);//未读消息
-void ChatWithFriend(TcpSocket mysocket,UserCommand command);//私聊
-void AddGroup(TcpSocket mysocket,UserCommand command);//加群
-void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
+void ChatWithFriend(TcpSocket mysocket,UserCommand command);//私聊请求
+void FriendSendMsg(TcpSocket mysocket,UserCommand command);//发送消息
+void ExitChat(TcpSocket mysocket,UserCommand command);
+//void AddGroup(TcpSocket mysocket,UserCommand command);//加群
+//void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
 
 void task(void *arg)
 {
@@ -86,12 +88,18 @@ void task(void *arg)
         case CHATWITHFRIEND:
             ChatWithFriend(mysocket,command);
             break;
-        case ADDGROUP:
+        case SENDMSG:
+            FriendSendMsg(mysocket,command);
+            break;
+        case EXITCHAT:
+            ExitChat(mysocket,command);
+            break;
+        /*case ADDGROUP:
             AddGroup(mysocket,command);
             break;
         case CREATEGROUP:
             CreateGroup(mysocket,command);
-            break;
+            break;*/
     }
 
     return;
@@ -252,6 +260,15 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
     string nums=redis.gethash(command.m_recvuid+"的未读消息","好友申请");
     redis.hsetValue(command.m_recvuid+"的未读消息","好友申请",to_string(stoi(nums)+1));
 
+    //给好友发送实时通知
+    if(redis.sismember("在线用户列表",command.m_recvuid))
+    {
+        //cout<<"1"<<endl;
+        string friend_fd=redis.gethash(command.m_recvuid,"通知套接字");
+        TcpSocket friendsocket(stoi(friend_fd));
+        friendsocket.SendMsg("来自"+command.m_uid+"的好友申请");
+    }
+
     mysocket.SendMsg("ok");
 }
 
@@ -288,18 +305,26 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
         string nickname=redis.gethash(command.m_option[0],"昵称");
         //cout<<nickname<<endl;
         redis.hsetValue(command.m_uid+"的好友列表",command.m_option[0],nickname);
-        redis.lpushValue(command.m_uid+"---"+command.m_option[0],"-------------------");
+        redis.lpushValue(command.m_uid+"和"+command.m_option[0]+"的聊天记录","-------------------");
 
         //完善申请者信息
         //command.m_nickname不可以正确输出
         redis.hsetValue(command.m_option[0]+"的好友列表",command.m_uid,command.m_nickname);
-        redis.lpushValue(command.m_option[0]+"---"+command.m_uid,"-------------------");
+        redis.lpushValue(command.m_option[0]+"和"+command.m_uid+"的聊天记录","-------------------");
 
         redis.lpushValue(command.m_option[0]+"的通知消息",command.m_uid+"通过了您的好友申请");
 
         // 申请者未读消息中的通知消息数量+1
         string num1 = redis.gethash(command.m_option[0] + "的未读消息", "通知消息");
         redis.hsetValue(command.m_option[0] + "的未读消息", "通知消息", to_string(stoi(num1)+1));
+
+        //给好友发送实时通知
+        if(redis.sismember("在线用户列表",command.m_option[0]))
+        {
+            string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
+            TcpSocket friendsocket(stoi(friend_fd));
+            friendsocket.SendMsg(command.m_uid+"通过了您的好友申请,快去和ta聊天吧");
+        }
 
         mysocket.SendMsg("ok");
         return;
@@ -320,7 +345,7 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
     //对不起我有病，我把宏定义的函数搞反了
     if(redis.removeMember(command.m_uid+"收到的好友申请",command.m_option[0]))
     {
-        cout<<"1"<<endl;
+        //cout<<"1"<<endl;
         //拒绝者未读消息好友申请
         string nownum = redis.gethash(command.m_uid + "的未读消息", "好友申请");
         redis.hsetValue(command.m_uid + "的未读消息", "好友申请", (to_string(stoi(nownum) - 1)));
@@ -331,6 +356,14 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
         string num1 = redis.gethash(command.m_option[0] + "的未读消息", "通知消息");
         redis.hsetValue(command.m_option[0] + "的未读消息", "通知消息", to_string(stoi(num1)+1));
         redis.lpushValue(command.m_option[0]+"的通知消息",command.m_uid+"拒绝了您的好友申请");
+
+        //给好友发送实时通知
+        if(redis.sismember("在线用户列表",command.m_option[0]))
+        {
+            string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
+            TcpSocket friendsocket(stoi(friend_fd));
+            friendsocket.SendMsg(command.m_uid+"拒绝了您的好友申请");
+        }
 
         mysocket.SendMsg("ok");
     }
@@ -447,6 +480,86 @@ void UnreadMessage(TcpSocket mysocket,UserCommand command)
     redis.hsetValue(command.m_uid + "的未读消息", "通知消息", "0");
 }
 
+void ChatWithFriend(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_uid+"的好友列表",command.m_recvuid))
+    {
+        mysocket.SendMsg("nofind");
+        exit(0);
+    }
+    mysocket.SendMsg("ok");
+    //如果存在该好友就打印历史聊天记录
+    vector<string>history=redis.lrangeAll(command.m_uid+"和"+command.m_recvuid+"的聊天记录");
+    for(const string& msg:history)
+    {
+        mysocket.SendMsg(msg);
+    }
+
+    //设置其聊天对象
+    redis.hsetValue(command.m_uid,"聊天对象",command.m_recvuid);
+
+    mysocket.SendMsg("历史聊天记录展示完毕");
+
+    
+}
+
+void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
+{
+    //将新的消息加入消息队列
+    string newmsg="我:"+command.m_option[0];
+    redis.lpushValue(command.m_uid+"和"+command.m_recvuid+"的聊天记录",newmsg);
+
+
+    //展示消息
+    string my_recvfd=redis.gethash(command.m_uid,"通知套接字");
+    TcpSocket my_socket(stoi(my_recvfd));
+    my_socket.SendMsg(L_GREEN+newmsg);
+
+
+    //没有被好友屏蔽
+    if(redis.sismember(command.m_recvuid+"的屏蔽列表",command.m_uid))
+    {
+        my_socket.SendMsg("您的消息已发出,但被对方拒收了");
+        return;
+        
+    }
+    string nickname=command.m_nickname;
+    string msg1=nickname+":"+command.m_option[0];
+    redis.lpushValue(command.m_recvuid+"和"+command.m_uid+"的聊天记录",msg1);
+    
+
+    //好友此时在线并且在和我聊天
+    if(redis.hexists("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
+    {
+        string fr_recvfd=redis.gethash(command.m_uid,"通知套接字");
+        TcpSocket fr_socket(stoi(fr_recvfd));
+        fr_socket.SendMsg(L_WHITE+msg1);
+
+    }else if(!redis.hexists("在线用户列表",command.m_recvuid))//好友不在线
+    {
+        string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
+        redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
+        redis.lpushValue(command.m_recvuid+"的通知消息",command.m_uid+"给您发来了一条消息");
+
+    }else{
+        string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
+        TcpSocket fr_socket(stoi(fr_recvfd));
+        fr_socket.SendMsg(command.m_uid+"给您发来了一条消息");
+    }
+
+
+    mysocket.SendMsg("ok");
+    return;
+
+}
+
+void ExitChat(TcpSocket mysocket,UserCommand command)
+{
+    redis.hsetValue(command.m_uid,"聊天对象","0");
+    mysocket.SendMsg("ok");
+    return ;
+}
+
 int main()
 {
 
@@ -512,7 +625,13 @@ int main()
                     perror("epoll_ctl-accept");
                     exit(0);
                 }
+
+                redis.hsetValue("fd-uid表",to_string(curfd),"-1");
+                cout<<"客户端连接成功，套接字为:"<<curfd<<endl;
             }else{
+
+                TcpSocket mysocket(curfd);
+                
                 //处理通信的文件描述符
                 //接收数据
                 char *buf;
@@ -524,17 +643,30 @@ int main()
                     cerr<<"error receiving data ."<<endl;
                     string uid =redis.gethash("fd-uid表",to_string(curfd)); // 获取客户端的用户ID
                     redis.sremValue("在线用户列表",uid);
+                    redis.hsetValue(uid,"通知套接字","-1");
+                    redis.hsetValue("fd-uid表",to_string(curfd),"-1");
                     close(curfd);
                     continue;
                 }
 
                 buf[ret]='\0';
                 string command_string=buf;
-                
+
+                UserCommand command;
+                command.From_Json(command_string);
                 cout<<"Recrived request:"<<command_string<<endl;
                 //创建任务，处理客户端请求
-                Argc_func argc_func(TcpSocket(curfd),command_string);
-                task(&argc_func);
+
+                
+                if(command.m_flag==RECV)
+                {
+                    redis.hsetValue(command.m_uid, "通知套接字", to_string(curfd));
+                    redis.hsetValue("fd-uid表", to_string(curfd), command.m_uid+"(通)");
+                }else{
+                    Argc_func argc_func(TcpSocket(curfd),command_string);
+                    task(&argc_func);
+                }
+                
             }
         }
         
