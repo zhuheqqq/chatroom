@@ -55,7 +55,7 @@ void *recvfunc(void *arg)//线程处理函数
     while(1)//循环接收消息
     {
         //cout<<"2"<<endl;
-        string recv=recvsocket.RecvMsg();
+        string recv=recvsocket.RecvMsg(); 
         if(recv=="close")
         {
             cout<<"服务器端已关闭"<<endl;
