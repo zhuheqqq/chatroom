@@ -40,9 +40,20 @@ void ViewOnlineStatus(TcpSocket mysocket,UserCommand command);//查看好友在�
 void UnreadMessage(TcpSocket mysocket,UserCommand command);//未读消息
 void ChatWithFriend(TcpSocket mysocket,UserCommand command);//私聊请求
 void FriendSendMsg(TcpSocket mysocket,UserCommand command);//发送消息
-void ExitChat(TcpSocket mysocket,UserCommand command);
-//void AddGroup(TcpSocket mysocket,UserCommand command);//加群
-//void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
+void ExitChat(TcpSocket mysocket,UserCommand command);//停止聊天
+void AddGroup(TcpSocket mysocket,UserCommand command);//加群
+void CreateGroup(TcpSocket mysocket,UserCommand command);//创建群聊
+void GroupList(TcpSocket mysocket,UserCommand command);//群聊列表
+void MemberList(TcpSocket mysocket,UserCommand command);//成员列表
+void DeleteGroup(TcpSocket mysocket,UserCommand command);//退出群聊
+void DeleteMember(TcpSocket mysocket,UserCommand command);//删除成员
+void AddManager(TcpSocket mysocket,UserCommand command);//添加管理员
+void DeleteManager(TcpSocket mysocket,UserCommand command);//删除管理员
+void DissolveGroup(TcpSocket mysocket,UserCommand command);//解散群聊
+void ApplyList(TcpSocket mysocket,UserCommand command);//申请加群列表
+void AgreeAddMember(TcpSocket mysocket,UserCommand command);//同意加群
+void RefuseAddMember(TcpSocket mysocket,UserCommand command);//拒绝加群
+
 
 void task(void *arg)
 {
@@ -94,12 +105,42 @@ void task(void *arg)
         case EXITCHAT:
             ExitChat(mysocket,command);
             break;
-        /*case ADDGROUP:
+        case ADDGROUP:
             AddGroup(mysocket,command);
             break;
         case CREATEGROUP:
             CreateGroup(mysocket,command);
-            break;*/
+            break;
+        case GROUPLIST:
+            GroupList(mysocket,command);
+            break;
+        case MEMBERLIST:
+            MemberList(mysocket,command);
+            break;
+        case DELETEGROUP:
+            DeleteGroup(mysocket,command);
+            break;
+        case DELETEMEMBER:
+            DeleteMember(mysocket,command);
+            break;
+        case ADDMANAGER:
+            AddManager(mysocket,command);
+            break;
+        case DELETEMANAGER:
+            DeleteManager(mysocket,command);
+            break;
+        case DISSOLVEGROUP:
+            DissolveGroup(mysocket,command);
+            break;
+        case APPLYLIST:
+            ApplyList(mysocket,command);
+            break;
+        case AGREEADDMEMBER:
+            AgreeAddMember(mysocket,command);
+            break;
+        case REFUSEADDMEMBER:
+            RefuseAddMember(mysocket,command);
+            break;
     }
 
     return;
@@ -133,6 +174,7 @@ void Sign_up(TcpSocket mysocket,UserCommand command)//注册选项
             redis.hsetValue(uid, "聊天对象", "无");
             redis.hsetValue(uid + "的未读消息", "通知消息", "0");
             redis.hsetValue(uid + "的未读消息", "好友申请", "0");
+            redis.hsetValue(uid + "的未读消息", "群聊消息", "0");
            
 
             mysocket.SendMsg(uid);
@@ -201,6 +243,12 @@ void Log_out(TcpSocket mysocket,UserCommand command)//功能已实现
 //如果好友列表可以展示在线状态，那么就没有必要有查看好友在线状态的选项
 void FriendList(TcpSocket mysocket,UserCommand command)
 {
+    if(!redis.exists(command.m_uid+"的好友列表"))
+    {
+        //cout<<"1"<<endl;
+        mysocket.SendMsg("none");
+        return;
+    }
     // 好友数量不为0，就遍历好友列表，根据在线状态发送要展示的内容
     
     vector<string> friendList = redis.getFriendList(command.m_uid,"的好友列表");
@@ -305,14 +353,14 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
         string nickname=redis.gethash(command.m_option[0],"昵称");
         //cout<<nickname<<endl;
         redis.hsetValue(command.m_uid+"的好友列表",command.m_option[0],nickname);
-        redis.lpushValue(command.m_uid+"和"+command.m_option[0]+"的聊天记录","-------------------");
+        redis.rpushValue(command.m_uid+"和"+command.m_option[0]+"的聊天记录","-------------------");
 
         //完善申请者信息
         //command.m_nickname不可以正确输出
         redis.hsetValue(command.m_option[0]+"的好友列表",command.m_uid,command.m_nickname);
-        redis.lpushValue(command.m_option[0]+"和"+command.m_uid+"的聊天记录","-------------------");
+        redis.rpushValue(command.m_option[0]+"和"+command.m_uid+"的聊天记录","-------------------");
 
-        redis.lpushValue(command.m_option[0]+"的通知消息",command.m_uid+"通过了您的好友申请");
+        redis.rpushValue(command.m_option[0]+"的通知消息",command.m_uid+"通过了您的好友申请");
 
         // 申请者未读消息中的通知消息数量+1
         string num1 = redis.gethash(command.m_option[0] + "的未读消息", "通知消息");
@@ -355,7 +403,7 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
         // 申请者未读消息中的通知消息数量+1
         string num1 = redis.gethash(command.m_option[0] + "的未读消息", "通知消息");
         redis.hsetValue(command.m_option[0] + "的未读消息", "通知消息", to_string(stoi(num1)+1));
-        redis.lpushValue(command.m_option[0]+"的通知消息",command.m_uid+"拒绝了您的好友申请");
+        redis.rpushValue(command.m_option[0]+"的通知消息",command.m_uid+"拒绝了您的好友申请");
 
         //给好友发送实时通知
         if(redis.sismember("在线用户列表",command.m_option[0]))
@@ -507,7 +555,7 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
 {
     //将新的消息加入消息队列
     string newmsg="我:"+command.m_option[0];
-    redis.lpushValue(command.m_uid+"和"+command.m_recvuid+"的聊天记录",newmsg);
+    redis.rpushValue(command.m_uid+"和"+command.m_recvuid+"的聊天记录",newmsg);
 
 
     //展示消息
@@ -525,7 +573,7 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
     }
     string uid=command.m_uid;
     string msg1=uid+":"+command.m_option[0];
-    redis.lpushValue(command.m_recvuid+"和"+command.m_uid+"的聊天记录",msg1);
+    redis.rpushValue(command.m_recvuid+"和"+command.m_uid+"的聊天记录",msg1);
     
 
     //好友此时在线并且在和我聊天
@@ -539,7 +587,7 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
     {
         string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
         redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
-        redis.lpushValue(command.m_recvuid+"的通知消息",command.m_uid+"给您发来了一条消息");
+        redis.rpushValue(command.m_recvuid+"的通知消息",command.m_uid+"给您发来了一条消息");
 
     }else{
         string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
@@ -639,6 +687,7 @@ int main()
                // memset(buf,0,sizeof(buf));用就出现段错误
 
                 int ret=recvMsg(curfd,&buf);
+                //cout<<ret<<endl;
                 if(ret<=0)
                 {
                     cerr<<"error receiving data ."<<endl;
@@ -651,6 +700,7 @@ int main()
                 }
 
                 buf[ret]='\0';
+                //cout<<buf<<endl;
                 string command_string=buf;
 
                 UserCommand command;
@@ -673,4 +723,364 @@ int main()
         
     } 
     
+}
+
+void CreateGroup(TcpSocket mysocket,UserCommand command)//创建群聊
+{
+    //判断好友列表里有没有该好友
+    if(!redis.hexists(command.m_uid+"的好友列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("nofind");
+        return;
+    }
+
+    //有的话进行下一步，随机到未被注册到的群聊uid
+    while(1)
+    {
+        //随机数这样好像不太行，写完之后可以换一种生成随机数的方法
+        random_device rd;
+        mt19937 gen(rd()); // 使用 Mersenne Twister 引擎作为随机数生成器
+        uniform_int_distribution<int> dis(10000000, 99999999); // 定义一个均匀分布的随机整数分布
+
+        string groupuid = to_string(dis(gen));
+        cout << "生成的随机群 uid 为：" << groupuid << endl;
+
+        if(redis.sismember("群聊集合",groupuid))
+        {
+            continue;
+        }else{
+            redis.saddvalue("群聊集合",groupuid);
+            //补充群聊详细信息
+            redis.hsetValue(groupuid+"的基本信息","群号",groupuid);
+            redis.hsetValue(groupuid+"的基本信息","群名称",groupuid);
+            redis.hsetValue(groupuid+"的基本信息","群介绍","无");
+            redis.hsetValue(groupuid+"群成员列表",command.m_uid,"群主");
+            redis.hsetValue(command.m_uid+"的群聊列表",groupuid,"群主");
+            redis.rpushValue(groupuid+"的群聊消息","这是一个新的群聊,欢迎大家的加入");
+
+            string num = redis.gethash(command.m_option[0] + "的未读消息", "通知消息");
+            redis.hsetValue(command.m_option[0] + "的未读消息", "通知消息", to_string(stoi(num)+1));
+            redis.rpushValue(command.m_option[0]+"的通知消息",command.m_uid+"邀请您加入群聊"+groupuid);
+
+            redis.hsetValue(groupuid+"群成员列表",command.m_option[0],"群成员");
+            redis.hsetValue(command.m_option[0]+"的群聊列表",groupuid,"群成员");
+
+            if(redis.sismember("在线用户列表",command.m_option[0]))
+            {
+                string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
+                TcpSocket friendsocket(stoi(friend_fd));
+                friendsocket.SendMsg(command.m_uid+"邀请您加入新的群聊");
+            }
+        }
+        mysocket.SendMsg(groupuid);
+        return;
+    }
+    
+
+}
+
+void GroupList(TcpSocket mysocket,UserCommand command)
+{
+    if(redis.hexists(command.m_uid,"的群聊列表"))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }
+
+    vector<string> grouplist=redis.getFriendList(command.m_uid,"的群聊列表");
+
+    for(const string& groupid:grouplist){
+        mysocket.SendMsg(groupid);
+    }
+
+    mysocket.SendMsg("end");
+}
+
+void AddGroup(TcpSocket mysocket,UserCommand command)
+{
+    if(redis.hexists(command.m_option[0]+"群成员列表",command.m_uid))
+    {
+        mysocket.SendMsg("handled");
+        return;
+    }else if(!redis.sismember("群聊集合",command.m_option[0]))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }else if(redis.hexists(command.m_option[0]+"的申请加群列表",command.m_uid)){
+        mysocket.SendMsg("had");
+    }else
+    {
+        //int num=redis.getListCount(command.m_option[0],"的群成员列表");
+
+        vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
+
+        for(const string& memberid:memberlist)
+        {
+            if(redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群成员")
+            {
+                string apply=command.m_uid+"申请加群"+command.m_option[0];
+                string num=redis.gethash(memberid+"的未读消息","群聊消息");
+                redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
+                redis.rpushValue(memberid+"群聊消息",apply);
+
+                if(redis.sismember("在线用户列表",memberid))
+                {
+                    string member_fd=redis.gethash(memberid,"通知套接字");
+                    TcpSocket membersocket(stoi(member_fd));
+                    membersocket.SendMsg(apply);
+                }
+            }
+        }
+
+        mysocket.SendMsg("ok");
+        return;
+    }
+}
+
+void MemberList(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_uid+"的群聊列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }else {
+        vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
+
+        for(const string& memberid:memberlist)
+        {
+            mysocket.SendMsg(memberid);
+        }
+        mysocket.SendMsg("end");
+    }
+}
+
+void DeleteGroup(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_uid+"的群聊列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }
+
+    //将群聊从用户的群聊列表里删除
+    redis.removeMember(command.m_uid+"的群聊列表",command.m_option[0]);
+    redis.removeMember(command.m_option[0]+"群成员列表",command.m_uid);
+    mysocket.SendMsg("ok");
+}
+
+void DeleteMember(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_recvuid+"群成员列表",command.m_uid))
+    {
+        mysocket.SendMsg("none");
+    }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)=="群成员")
+    {
+        mysocket.SendMsg("no");
+        return;
+    }
+
+    redis.removeMember(command.m_option[0]+"的群聊列表",command.m_recvuid);
+    redis.removeMember(command.m_recvuid+"群成员列表",command.m_option[0]);
+
+    vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
+
+    for(const string& memberid:memberlist)
+    {
+        if(redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群成员")
+        {
+            string apply=command.m_uid+"将"+command.m_option[0]+"移除群聊"+command.m_recvuid;
+            string num=redis.gethash(memberid+"的未读消息","群聊消息");
+            redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
+            redis.rpushValue(memberid+"群聊消息",apply);
+
+            if(redis.sismember("在线用户列表",memberid))
+            {
+                string member_fd=redis.gethash(memberid,"通知套接字");
+                TcpSocket membersocket(stoi(member_fd));
+                membersocket.SendMsg(apply);
+            }
+        }
+    }
+
+    mysocket.SendMsg("ok");
+    return;
+
+}
+
+void AddManager(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_uid+"的群聊列表",command.m_recvuid))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群主")
+    {
+        mysocket.SendMsg("no");
+    }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_option[0])=="群管理员")
+    {
+        mysocket.SendMsg("handled");
+    }
+
+    redis.hsetValue(command.m_recvuid+"群成员列表",command.m_option[0],"群管理员");
+
+    if(redis.sismember("在线用户列表",command.m_option[0]))
+    {
+        string member_fd=redis.gethash(command.m_option[0],"通知套接字");
+        TcpSocket membersocket(stoi(member_fd));
+        membersocket.SendMsg(command.m_uid+"将你添加为群聊"+command.m_recvuid+"的群管理员");
+    }
+
+    mysocket.SendMsg("ok");
+}
+
+void DeleteManager(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_uid+"的群聊列表",command.m_recvuid))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群主")
+    {
+        mysocket.SendMsg("no");
+    }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_option[0])!="群管理员")
+    {
+        mysocket.SendMsg("handled");
+    }
+
+    redis.hsetValue(command.m_recvuid+"群成员列表",command.m_option[0],"群成员");
+
+    if(redis.sismember("在线用户列表",command.m_option[0]))
+    {
+        string member_fd=redis.gethash(command.m_option[0],"通知套接字");
+        TcpSocket membersocket(stoi(member_fd));
+        membersocket.SendMsg(command.m_uid+"将你在"+command.m_recvuid+"的群管理员身份移除");
+    }
+
+    mysocket.SendMsg("ok");
+}
+
+void DissolveGroup(TcpSocket mysocket,UserCommand command)
+{
+    if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群主")
+    {
+        mysocket.SendMsg("no");
+        return;
+    }
+
+    redis.sremValue("群聊集合",command.m_option[0]);//将群聊从群聊集合中删除
+    redis.delKey(command.m_option[0]);//删除群聊信息
+
+    vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
+
+    for(const string& memberid:memberlist)
+    {
+        redis.removeMember(memberid+"的群聊列表",command.m_option[0]);
+        string apply=command.m_uid+"(群主)将"+command.m_option[0]+"群聊解散";
+        string num=redis.gethash(memberid+"的未读消息","群聊消息");
+        redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
+        redis.rpushValue(memberid+"群聊消息",apply);
+
+        if(redis.sismember("在线用户列表",memberid))
+        {
+            string member_fd=redis.gethash(memberid,"通知套接字");
+            TcpSocket membersocket(stoi(member_fd));
+            membersocket.SendMsg(apply);
+        }
+        
+    }
+
+}
+
+void ApplyList(TcpSocket mysocket,UserCommand command)
+{
+    if(redis.gethash(command.m_option[0]+"群成员列表",command.m_uid)!="群成员")
+    {
+        vector<string> memberlist=redis.getFriendList(command.m_option[0],"的申请加群列表");
+
+        for(const string& memberid:memberlist)
+        {
+            mysocket.SendMsg(memberid);
+        }
+        mysocket.SendMsg("end");
+    }else
+    {
+        mysocket.SendMsg("no");
+    }
+}
+
+void AgreeAddMember(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_recvuid+"的申请加群列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("nofind");
+        return;
+    }else{
+        redis.removeMember(command.m_recvuid+"的申请加群列表",command.m_option[0]);
+        redis.hsetValue(command.m_recvuid+"群成员列表",command.m_option[0],"群主");
+        redis.hsetValue(command.m_option[0]+"的群聊列表",command.m_recvuid,"群成员");
+
+        vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
+
+        for(const string& memberid:memberlist)
+        {
+            if(redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群成员"&&command.m_uid!=memberid)
+            {
+                string apply=command.m_uid+"同意了"+command.m_option[0]+"的加群申请";
+                string num=redis.gethash(memberid+"的未读消息","群聊消息");
+                redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
+                redis.rpushValue(memberid+"群聊消息",apply);
+
+                if(redis.sismember("在线用户列表",memberid))
+                {
+                    string member_fd=redis.gethash(memberid,"通知套接字");
+                    TcpSocket membersocket(stoi(member_fd));
+                    membersocket.SendMsg(apply);
+                }
+            }
+        }
+    }
+    mysocket.SendMsg("ok");
+    if(redis.sismember("在线用户列表",command.m_option[0]))
+    {
+        string member_fd=redis.gethash(command.m_option[0],"通知套接字");
+        TcpSocket membersocket(stoi(member_fd));
+        membersocket.SendMsg(command.m_recvuid+":您的加群申请已被通过");
+    }
+}
+
+void RefuseAddMember(TcpSocket mysocket,UserCommand command)
+{
+    if(!redis.hexists(command.m_recvuid+"的申请加群列表",command.m_option[0]))
+    {
+        mysocket.SendMsg("nofind");
+        return;
+    }else{
+        redis.removeMember(command.m_recvuid+"的申请加群列表",command.m_option[0]);
+        vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
+
+        for(const string& memberid:memberlist)
+        {
+            if(redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群成员"&&command.m_uid!=memberid)
+            {
+                string apply=command.m_uid+"拒绝了"+command.m_option[0]+"的加群申请";
+                string num=redis.gethash(memberid+"的未读消息","群聊消息");
+                redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
+                redis.rpushValue(memberid+"群聊消息",apply);
+
+                if(redis.sismember("在线用户列表",memberid))
+                {
+                    string member_fd=redis.gethash(memberid,"通知套接字");
+                    TcpSocket membersocket(stoi(member_fd));
+                    membersocket.SendMsg(apply);
+                }
+            }
+        }
+        mysocket.SendMsg("ok");
+        if(redis.sismember("在线用户列表",command.m_option[0]))
+        {
+            string member_fd=redis.gethash(command.m_option[0],"通知套接字");
+            TcpSocket membersocket(stoi(member_fd));
+            membersocket.SendMsg(command.m_recvuid+":您的加群申请被拒绝");
+        }
+    }
 }
