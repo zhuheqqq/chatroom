@@ -64,7 +64,7 @@ void *recvfunc(void *arg)//线程处理函数
         }
         //cout<<"1"<<endl;
         // 使用 ANSI 转义序列将光标移动到终端最底部并输出消息
-        cout <<"\033[44m" << recv<<"\033[0m" << endl;
+        cout <<  recv << endl;
         //cout<<"0"<<endl;
 
     }

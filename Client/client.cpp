@@ -275,7 +275,7 @@ int FriendList()
         }
     }
 
-    cout << "好友列表展示完毕,带括号表示好友不在线" << endl;
+    cout << "好友列表展示完毕,绿色表示好友在线" << endl;
 
     return 1;
 }
@@ -609,7 +609,7 @@ int ChatWithFriend()
             {
                 cout<<"服务器端已关闭"<<endl;
                 exit(0);
-            }else if(historymsg=="历史聊天记录展示完毕")
+            }else if(historymsg=="历史聊天记录展示完毕")//未打印
             {
                 break;
             }else{
@@ -666,6 +666,9 @@ int ChatWithFriend()
             {
                 cout<<"服务器端已关闭"<<endl;
                 exit(0);
+            }else if(recv=="no")
+            {
+                return 0;
             }else if(recv=="ok")
             {
                 continue;
@@ -795,6 +798,8 @@ int GroupList()
         exit(0);
     }
 
+    system("clear");
+
     string Group;
     while ((Group = mysocket.RecvMsg()) != "end")
     {
@@ -893,7 +898,7 @@ void AboutGroup()
 void MemberList(string groupuid)//群成员列表
 {
     UserCommand command1(Curcommand.m_uid,"","",MEMBERLIST,{groupuid});
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -923,7 +928,7 @@ void MemberList(string groupuid)//群成员列表
 void DeleteGroup(string groupuid)
 {
     UserCommand command1(Curcommand.m_uid,"","",DELETEGROUP,{groupuid});
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -953,7 +958,7 @@ void DeleteGroup(string groupuid)
 void ApplyList(string groupuid)//申请加群列表
 {
     UserCommand command1(Curcommand.m_uid,"","",APPLYLIST,{groupuid});
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -986,7 +991,7 @@ void ApplyList(string groupuid)//申请加群列表
     while(agreeuid!="exit")
     {
         UserCommand command1(Curcommand.m_uid,"",groupuid,AGREEADDMEMBER,{agreeuid});
-        ret = mysocket.SendMsg(Curcommand.To_Json());
+        ret = mysocket.SendMsg(command1.To_Json());
         if (ret == 0||ret == -1)
         {
             cout << "服务器端已关闭" << endl;
@@ -1020,7 +1025,7 @@ void ApplyList(string groupuid)//申请加群列表
         while(refuseuid!="exit")
         {
             UserCommand command1(Curcommand.m_uid,"",groupuid,REFUSEADDMEMBER,{refuseuid});
-            ret = mysocket.SendMsg(Curcommand.To_Json());
+            ret = mysocket.SendMsg(command1.To_Json());
             if (ret == 0||ret == -1)
             {
                 cout << "服务器端已关闭" << endl;
@@ -1060,7 +1065,7 @@ void DeleteMember(string groupuid)
     cin>>deleteuid;
 
     UserCommand command1(Curcommand.m_uid,"",groupuid,DELETEMEMBER,{deleteuid});
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -1098,7 +1103,7 @@ void AddManager(string groupuid)
     cin>>addmanager;
 
     UserCommand command1(Curcommand.m_uid,"",groupuid,ADDMANAGER,{addmanager});
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -1140,7 +1145,7 @@ void DeleteManager(string groupuid)
     cin>>deletemanager;
 
     UserCommand command1(Curcommand.m_uid,"",groupuid,DELETEMANAGER,{deletemanager});
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -1183,7 +1188,7 @@ void DissolveGroup(string groupuid)
     if(choice=="yes")
     {
         UserCommand command1(Curcommand.m_uid,"","",DISSOLVEGROUP,{groupuid});
-        int ret = mysocket.SendMsg(Curcommand.To_Json());
+        int ret = mysocket.SendMsg(command1.To_Json());
         if (ret == 0||ret == -1)
         {
             cout << "服务器端已关闭" << endl;
