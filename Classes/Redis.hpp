@@ -149,6 +149,22 @@ bool sremValue(const string& key, const string& member) {
     return false; // 返回 false 表示删除失败或成员不存在
 }
 
+//检查键是否存在
+bool exists(const string& key) {
+    // 使用 EXISTS 命令检查指定键是否存在
+    redisReply* reply = (redisReply*)redisCommand(context, "EXISTS %s", key.c_str());
+    if (reply != nullptr && reply->type == REDIS_REPLY_INTEGER) {
+        bool exists = (reply->integer == 1); // 检查整数值是否为1（键存在）
+        freeReplyObject(reply);
+        return exists;
+    }
+    
+    if (reply) {
+        freeReplyObject(reply);
+    }
+    return false; // 返回 false 表示键不存在或出现错误
+}
+
 //删除一个键
 bool delKey(const string& key) {
         // 发送 DEL 命令到 Redis 并存储回复。
