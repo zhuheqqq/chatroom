@@ -87,6 +87,9 @@ void task(void *arg)
         case BLOCKFRIEND:
             Block_Friend(mysocket,command);
             break;
+        case RESTOREFRIEND:
+            Restore_Friend(mysocket,command);
+            break;
         case REFUSEADDFRIEND:
             RefuseAddFriend(mysocket,command);
             break;
@@ -257,9 +260,9 @@ void FriendList(TcpSocket mysocket,UserCommand command)
     for (const string& friendID : friendList) {
         if (!redis.sismember(command.m_uid + "的屏蔽列表", friendID)) {
             if (redis.sismember("在线用户列表",friendID)) {
-                mysocket.SendMsg(friendID);
+                mysocket.SendMsg(L_GREEN+friendID+NONE);
             } else {
-                mysocket.SendMsg("(" + friendID + ")");
+                mysocket.SendMsg(friendID);
             }
         }
     }
@@ -268,7 +271,7 @@ void FriendList(TcpSocket mysocket,UserCommand command)
 
 }
 
-void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
+void Add_Friend(TcpSocket mysocket,UserCommand command)
 {
     if(!redis.sismember("用户uid集合",command.m_recvuid))//如果没有找到该用户返回错误
     {
@@ -314,7 +317,8 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)//没写完
         //cout<<"1"<<endl;
         string friend_fd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket friendsocket(stoi(friend_fd));
-        friendsocket.SendMsg("您收到来自"+command.m_uid+"的好友申请");
+        string msg="您收到来自"+command.m_uid+"的好友申请";
+        friendsocket.SendMsg(L_RED+msg+NONE);
     }
 
     mysocket.SendMsg("ok");
@@ -371,7 +375,7 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
         {
             string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
             TcpSocket friendsocket(stoi(friend_fd));
-            friendsocket.SendMsg(command.m_uid+"通过了您的好友申请,快去和ta聊天吧");
+            friendsocket.SendMsg(L_RED+command.m_uid+"通过了您的好友申请,快去和ta聊天吧"+NONE);
         }
 
         mysocket.SendMsg("ok");
@@ -410,7 +414,7 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
         {
             string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
             TcpSocket friendsocket(stoi(friend_fd));
-            friendsocket.SendMsg(command.m_uid+"拒绝了您的好友申请");
+            friendsocket.SendMsg(L_RED+command.m_uid+"拒绝了您的好友申请"+NONE);
         }
 
         mysocket.SendMsg("ok");
@@ -418,6 +422,7 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
     
 
 }
+
 
 void Block_Friend(TcpSocket mysocket,UserCommand command)
 {
@@ -464,6 +469,7 @@ void Restore_Friend(TcpSocket mysocket,UserCommand command)
 
     if (success)
     {
+        //cout<<"1"<<endl;
         mysocket.SendMsg("ok"); // 好友成功解除屏蔽
     }
     else
@@ -520,7 +526,7 @@ void UnreadMessage(TcpSocket mysocket,UserCommand command)
 
     response+="请尽快处理\n";
 
-    mysocket.SendMsg(response);
+    mysocket.SendMsg(L_YELLOW+response+NONE);
 
     // 删除通知消息
     redis.delKey(command.m_uid + "的通知消息");
@@ -561,13 +567,15 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
     //展示消息
     string my_recvfd=redis.gethash(command.m_uid,"通知套接字");
     TcpSocket my_socket(stoi(my_recvfd));
-    my_socket.SendMsg(L_GREEN+newmsg+NONE);
+    my_socket.SendMsg(L_WHITE + newmsg + NONE);
 
 
     //没有被好友屏蔽
     if(redis.sismember(command.m_recvuid+"的屏蔽列表",command.m_uid))
     {
-        my_socket.SendMsg("您的消息已发出,但被对方拒收了");
+        string msg="您的消息已发出,但被对方拒收了";
+        my_socket.SendMsg(L_RED+msg+NONE);
+        mysocket.SendMsg("no");
         return;
         
     }
@@ -581,7 +589,7 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
     {
         string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket fr_socket(stoi(fr_recvfd));
-        fr_socket.SendMsg(L_WHITE+msg1);
+        fr_socket.SendMsg(L_GREEN+msg1+NONE);
 
     }else if(!redis.sismember("在线用户列表",command.m_recvuid))//好友不在线
     {
@@ -592,7 +600,7 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
     }else{
         string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket fr_socket(stoi(fr_recvfd));
-        fr_socket.SendMsg(command.m_uid+"给您发来了一条消息");
+        fr_socket.SendMsg(L_RED+command.m_uid+"给您发来了一条消息"+NONE);
     }
 
 
@@ -769,7 +777,7 @@ void CreateGroup(TcpSocket mysocket,UserCommand command)//创建群聊
             {
                 string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
                 TcpSocket friendsocket(stoi(friend_fd));
-                friendsocket.SendMsg(command.m_uid+"邀请您加入新的群聊");
+                friendsocket.SendMsg(L_BLUE+command.m_uid+"邀请您加入新的群聊"+NONE);
             }
         }
         mysocket.SendMsg(groupuid);
@@ -781,7 +789,7 @@ void CreateGroup(TcpSocket mysocket,UserCommand command)//创建群聊
 
 void GroupList(TcpSocket mysocket,UserCommand command)
 {
-    if(redis.hexists(command.m_uid,"的群聊列表"))
+    if(!redis.exists(command.m_uid+"的群聊列表"))
     {
         mysocket.SendMsg("none");
         return;
@@ -827,7 +835,7 @@ void AddGroup(TcpSocket mysocket,UserCommand command)
                 {
                     string member_fd=redis.gethash(memberid,"通知套接字");
                     TcpSocket membersocket(stoi(member_fd));
-                    membersocket.SendMsg(apply);
+                    membersocket.SendMsg(L_BLUE+apply+NONE);
                 }
             }
         }
@@ -848,7 +856,7 @@ void MemberList(TcpSocket mysocket,UserCommand command)
 
         for(const string& memberid:memberlist)
         {
-            mysocket.SendMsg(memberid);
+            mysocket.SendMsg(memberid);//一直循环打印
         }
         mysocket.SendMsg("end");
     }
@@ -897,7 +905,7 @@ void DeleteMember(TcpSocket mysocket,UserCommand command)
             {
                 string member_fd=redis.gethash(memberid,"通知套接字");
                 TcpSocket membersocket(stoi(member_fd));
-                membersocket.SendMsg(apply);
+                membersocket.SendMsg(L_BLUE+apply+NONE);
             }
         }
     }
@@ -927,7 +935,7 @@ void AddManager(TcpSocket mysocket,UserCommand command)
     {
         string member_fd=redis.gethash(command.m_option[0],"通知套接字");
         TcpSocket membersocket(stoi(member_fd));
-        membersocket.SendMsg(command.m_uid+"将你添加为群聊"+command.m_recvuid+"的群管理员");
+        membersocket.SendMsg(L_BLUE+command.m_uid+"将你添加为群聊"+command.m_recvuid+"的群管理员"+NONE);
     }
 
     mysocket.SendMsg("ok");
@@ -953,7 +961,7 @@ void DeleteManager(TcpSocket mysocket,UserCommand command)
     {
         string member_fd=redis.gethash(command.m_option[0],"通知套接字");
         TcpSocket membersocket(stoi(member_fd));
-        membersocket.SendMsg(command.m_uid+"将你在"+command.m_recvuid+"的群管理员身份移除");
+        membersocket.SendMsg(L_BLUE+command.m_uid+"将你在"+command.m_recvuid+"的群管理员身份移除"+NONE);
     }
 
     mysocket.SendMsg("ok");
@@ -984,7 +992,7 @@ void DissolveGroup(TcpSocket mysocket,UserCommand command)
         {
             string member_fd=redis.gethash(memberid,"通知套接字");
             TcpSocket membersocket(stoi(member_fd));
-            membersocket.SendMsg(apply);
+            membersocket.SendMsg(L_BLUE+apply+NONE);
         }
         
     }
@@ -1034,7 +1042,7 @@ void AgreeAddMember(TcpSocket mysocket,UserCommand command)
                 {
                     string member_fd=redis.gethash(memberid,"通知套接字");
                     TcpSocket membersocket(stoi(member_fd));
-                    membersocket.SendMsg(apply);
+                    membersocket.SendMsg(L_BLUE+apply+NONE);
                 }
             }
         }
@@ -1044,7 +1052,7 @@ void AgreeAddMember(TcpSocket mysocket,UserCommand command)
     {
         string member_fd=redis.gethash(command.m_option[0],"通知套接字");
         TcpSocket membersocket(stoi(member_fd));
-        membersocket.SendMsg(command.m_recvuid+":您的加群申请已被通过");
+        membersocket.SendMsg(L_BLUE+command.m_recvuid+":您的加群申请已被通过"+NONE);
     }
 }
 
@@ -1071,7 +1079,7 @@ void RefuseAddMember(TcpSocket mysocket,UserCommand command)
                 {
                     string member_fd=redis.gethash(memberid,"通知套接字");
                     TcpSocket membersocket(stoi(member_fd));
-                    membersocket.SendMsg(apply);
+                    membersocket.SendMsg(L_BLUE+apply+NONE);
                 }
             }
         }
@@ -1080,7 +1088,7 @@ void RefuseAddMember(TcpSocket mysocket,UserCommand command)
         {
             string member_fd=redis.gethash(command.m_option[0],"通知套接字");
             TcpSocket membersocket(stoi(member_fd));
-            membersocket.SendMsg(command.m_recvuid+":您的加群申请被拒绝");
+            membersocket.SendMsg(L_BLUE+command.m_recvuid+":您的加群申请被拒绝"+NONE);
         }
     }
 }

@@ -34,3 +34,10 @@
 #define L_GREEN "\033[1;32m"
 #define NONE "\033[0m"
 #define L_WHITE "\033[1;37m"
+#define B_BLUE "\033[44m"     // 蓝色背景
+#define F_WHITE "\033[1;37m"  // 白色前景
+#define NONE "\033[0m"        // 重置所有效果
+#define L_PRED "\033[1;35m"      //洋红色
+#define L_YELLOW "\033[1;33m" //黄色
+#define L_RED "\033[1;31m"  //红色
+#define L_BLUE "\033[1;34m"//蓝色
