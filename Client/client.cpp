@@ -13,7 +13,7 @@ UserCommand Curcommand;
 void *recvfunc(void *arg);//线程处理函数
 void Log_out();//注销函数
 int FriendManage();//好友管理函数
-int GroupManage();//群聊管理函数
+void GroupManage();//群聊管理函数
 int FriendList();//展示好友列表
 int Add_Friend();//添加好友
 int Delete_Friend();//删除好友
@@ -28,15 +28,15 @@ void AddGroup();//添加群聊
 void CreateGroup();//创建群聊
 int GroupList();//展示群聊列表
 void AboutGroup();//群聊相关内容
-void MemberList();//群成员列表
-void DeleteGroup();//退出群聊
-void ApplyList();//申请加群列表
+void MemberList(string groupuid);//群成员列表
+void DeleteGroup(string groupuid);//退出群聊
+void ApplyList(string groupuid);//申请加群列表
 //void AgreeAddMember();//同意加群
 //void RefuseAddMember();//拒绝加群
-void DeleteMember();//移除群成员
-void AddManager();//增加管理员
-void DeleteManager();//取消管理员身份
-void DissolveGroup();//解散群聊
+void DeleteMember(string groupuid);//移除群成员
+void AddManager(string groupuid);//增加管理员
+void DeleteManager(string groupuid);//取消管理员身份
+void DissolveGroup(string groupuid);//解散群聊
 
 
 int main()
@@ -164,7 +164,7 @@ int FriendManage()
     return 0;
 }
 
-int GroupManage()
+void GroupManage()
 {
     while(1)
     {
@@ -178,7 +178,7 @@ int GroupManage()
         if (cin.eof()) // 检查是否到达文件结尾即有ctrl+d信号的出现
         {
             cout << "Reached the end of the input" << endl;
-            return 0;
+            return;
         }
 
         cin.clear(); // 清除输入流的错误状态
@@ -205,10 +205,12 @@ int GroupManage()
         }else if(option==4)
         {
             //群聊相关
+            AboutGroup();
             //break;
 
         }else if(option==5)
         {
+            system("clear");
             break;
 
         }else{
@@ -247,14 +249,14 @@ void Log_out() // 注销功能函数
 int FriendList()
 {
     UserCommand command1(Curcommand.m_uid,Curcommand.m_nickname,"",FRIENDLIST,{""});//展示好友列表
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
         exit(0);
     }
 
-     string Friend;
+    string Friend;
     while ((Friend = mysocket.RecvMsg()) != "end")
     {
         if (Friend == "none")
@@ -670,6 +672,7 @@ int ChatWithFriend()
             }
         }
     }
+    return 1;
 
 }
 
@@ -725,54 +728,67 @@ void AddGroup()
         cout<<"您已在该群聊中,无需反复加群"<<endl;
         return;
 
-    }else if(recv=="ok")
+    }else if(recv=="none")
     {
-        cout<<"加群申请已发送,请耐心等待回复"<<endl;
-        return;
-
-    }else{
         cout<<"未找到该群,请确认群聊uid是否正确"<<endl;
         return;
 
+    }else if(recv=="ok"){
+        cout<<"加群申请已发送,请耐心等待回复"<<endl;
+        return;
+
+    }else if(recv=="had"){
+        cout<<"已发送过加群申请,请耐心等待回复"<<endl;
+        return;
+
+    }else{
+        cout<<"其他错误"<<endl;
+        return;
     }
 }
 
 void CreateGroup()
 {
-    FriendList();
-    cout<<"请选择一个您想拉入群聊的好友"<<endl;
-    string frienduid;
-    cin>>frienduid;
-
-    UserCommand command1(Curcommand.m_uid,"","",CREATAGROUP,{frienduid});
-    int ret=mysocket.SendMsg(command1.To_Json());
-    if(ret==0||ret==-1)
+    int flag=FriendList();
+    if(flag==1)
     {
-        cout<<"服务器端已关闭"<<endl;
-        exit(0);
+        cout<<"请选择一个您想拉入群聊的好友"<<endl;
+        string frienduid;
+        cin>>frienduid;
 
-    }
+        UserCommand command1(Curcommand.m_uid,"","",CREATEGROUP,{frienduid});
+        int ret=mysocket.SendMsg(command1.To_Json());
+        if(ret==0||ret==-1)
+        {
+            cout<<"服务器端已关闭"<<endl;
+            exit(0);
 
-    //接收回复
-    string recv=mysocket.RecvMsg();
-    if(recv=="close")
-    {
-        cout<<"服务器端已关闭"<<endl;
-        exit(0);
-    }else if(recv=="nofind")
-    {
-        cout<<"您暂时还没有该好友"<<endl;
-        return;
+        }
+
+        //接收回复
+        string recv=mysocket.RecvMsg();
+        if(recv=="close")
+        {
+            cout<<"服务器端已关闭"<<endl;
+            exit(0);
+        }else if(recv=="nofind")
+        {
+            cout<<"您暂时还没有该好友"<<endl;
+            return;
+        }else{
+            cout<<"群聊创建成功,群号为:"<<recv<<endl;
+            return;
+        }
     }else{
-        cout<<"群聊创建成功,群号为:"<<recv<<endl;
         return;
     }
+    
 }
 
 int GroupList()
 {
-    UserCommand command1(Curcommand.m_uid,Curcommand.m_nickname,"",GROUPLIST,{""});//展示好友列表
-    int ret = mysocket.SendMsg(Curcommand.To_Json());
+    UserCommand command1(Curcommand.m_uid,Curcommand.m_nickname,"",GROUPLIST,{""});//展示群聊列表
+    int ret = mysocket.SendMsg(command1.To_Json());
     if (ret == 0||ret == -1)
     {
         cout << "服务器端已关闭" << endl;
@@ -784,6 +800,7 @@ int GroupList()
     {
         if (Group == "none")
         {
+            system("clear");
             cout << "您当前还没有加入群聊" << endl;
             return 0;
         }
@@ -825,18 +842,23 @@ void AboutGroup()
         cin.clear(); // 清除输入流的错误状态
         cin.sync();  // 清空输入缓冲区
 
+        GroupList();//先展示群聊列表
+        string groupuid;
+        cout<<"您想查看详细信息的群聊uid为:"<<endl;
+        cin>>groupuid;
+
         if(option!=8)
         {
             switch (option)
             {
                 case 1:
-                    MemberList();
+                    MemberList(groupuid);
                     break;
                 case 2:
-                    DeleteGroup();
+                    DeleteGroup(groupuid);
                     break;
                 case 3:
-                    ApplyList();
+                    ApplyList(groupuid);
                     break;
                 /*case 4:
                     AgreeAddMember();
@@ -845,16 +867,16 @@ void AboutGroup()
                     RefuseAddMember();
                     break;*/
                 case 4:
-                    DeleteMember();
+                    DeleteMember(groupuid);
                     break;
                 case 5:
-                    AddManager();
+                    AddManager(groupuid);
                     break;
                 case 6:
-                    DeleteManager();
+                    DeleteManager(groupuid);
                     break;
                 case 7:
-                    DissolveGroup();
+                    DissolveGroup(groupuid);
                     break;
                 default:
                 system("clear");
@@ -868,14 +890,8 @@ void AboutGroup()
     }
 }
 
-void MemberList()//群成员列表
+void MemberList(string groupuid)//群成员列表
 {
-    GroupList();//先展示群聊列表
-    cout<<"您想查看群成员列表的群聊uid为:"<<endl;
-
-    string groupuid;
-    cin>>groupuid;
-
     UserCommand command1(Curcommand.m_uid,"","",MEMBERLIST,{groupuid});
     int ret = mysocket.SendMsg(Curcommand.To_Json());
     if (ret == 0||ret == -1)
@@ -887,7 +903,7 @@ void MemberList()//群成员列表
     string member=mysocket.RecvMsg();
     while(member!="end")
     {
-            if(member=="close")
+        if(member=="close")
         {
             cout<<"服务器端已关闭"<<endl;
             exit(0);
@@ -899,20 +915,14 @@ void MemberList()//群成员列表
             cout<<member<<endl;
         }
     }
-    cout<<"群聊列表展示完毕"<<endl;
+    cout<<"群成员列表展示完毕"<<endl;
     return;
     
 }
 
-void DeleteGroup()
+void DeleteGroup(string groupuid)
 {
-    GroupList();//先展示群聊列表
-    cout<<"您想退出群聊的uid为;"<<endl;
-
-    string deletegroup;
-    cin>>deletegroup;
-
-    UserCommand command1(Curcommand.m_uid,"","",DELETEGROUP,{deletegroup});
+    UserCommand command1(Curcommand.m_uid,"","",DELETEGROUP,{groupuid});
     int ret = mysocket.SendMsg(Curcommand.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -940,15 +950,9 @@ void DeleteGroup()
     }
 }
 
-void ApplyList()//申请加群列表
+void ApplyList(string groupuid)//申请加群列表
 {
-    GroupList();//先展示群聊列表
-
-    string applygroup;
-    cout<<"您想查看申请加群的群聊uid为:"<<endl;
-
-    cin>>applygroup;
-    UserCommand command1(Curcommand.m_uid,"","",APPLYLIST,{applygroup});
+    UserCommand command1(Curcommand.m_uid,"","",APPLYLIST,{groupuid});
     int ret = mysocket.SendMsg(Curcommand.To_Json());
     if (ret == 0||ret == -1)
     {
@@ -959,7 +963,7 @@ void ApplyList()//申请加群列表
     string recv=mysocket.RecvMsg();
     while(recv!="end")
     {
-            if(recv=="close")
+        if(recv=="close")
         {
             cout<<"服务器端已关闭"<<endl;
             exit(0);
@@ -981,7 +985,7 @@ void ApplyList()//申请加群列表
     cin>>agreeuid;
     while(agreeuid!="exit")
     {
-        UserCommand command1(Curcommand.m_uid,"","",AGREEADDMEMBER,{agreeuid});
+        UserCommand command1(Curcommand.m_uid,"",groupuid,AGREEADDMEMBER,{agreeuid});
         ret = mysocket.SendMsg(Curcommand.To_Json());
         if (ret == 0||ret == -1)
         {
@@ -1015,7 +1019,7 @@ void ApplyList()//申请加群列表
         cin>>refuseuid;
         while(refuseuid!="exit")
         {
-            UserCommand command1(Curcommand.m_uid,"","",REFUSEADDMEMBER,{refuseuid});
+            UserCommand command1(Curcommand.m_uid,"",groupuid,REFUSEADDMEMBER,{refuseuid});
             ret = mysocket.SendMsg(Curcommand.To_Json());
             if (ret == 0||ret == -1)
             {
@@ -1048,15 +1052,9 @@ void ApplyList()//申请加群列表
     
 }
 
-void DeleteMember()
+void DeleteMember(string groupuid)
 {
-    GroupList();//先展示群聊列表
-
-    string groupuid;
-    cout<<"您想操作的群聊的uid为:"<<endl;
-    cin>>groupuid;
-
-    MemberList();
+    MemberList(groupuid);
     string deleteuid;
     cout<<"您想移除的群成员的uid为:"<<endl;
     cin>>deleteuid;
@@ -1092,15 +1090,9 @@ void DeleteMember()
     }
 }
 
-void AddManager()
+void AddManager(string groupuid)
 {
-    GroupList();//先展示群聊列表
-
-    string groupuid;
-    cout<<"您想操作的群聊的uid为:"<<endl;
-    cin>>groupuid;
-
-    MemberList();
+    MemberList(groupuid);
     string addmanager;
     cout<<"您想添加成管理员的群成员的uid为:"<<endl;
     cin>>addmanager;
@@ -1140,15 +1132,9 @@ void AddManager()
     }
 }
 
-void DeleteManager()
+void DeleteManager(string groupuid)
 {
-    GroupList();//先展示群聊列表
-
-    string groupuid;
-    cout<<"您想操作的群聊的uid为:"<<endl;
-    cin>>groupuid;
-
-    MemberList();
+    MemberList(groupuid);
     string deletemanager;
     cout<<"您想移除的群管理的uid为:"<<endl;
     cin>>deletemanager;
@@ -1166,13 +1152,17 @@ void DeleteManager()
     {
         cout<<"服务器端已关闭"<<endl;
         exit(0);
-    }else if(recv=="no")
+    }else if(recv=="none")
+    {
+       cout<<"您不在此群聊中"<<endl;
+        return;
+    }else if(recv=="handled")
     {
         cout<<"该成员不是管理员,无需取消管理员身份"<<endl;
         return;
-    }else if(recv=="none")
+    }else if(recv=="no")
     {
-        cout<<"该用户并非本群成员"<<endl;
+        cout<<"不好意思,您没有此操作权限"<<endl;
         return;
     }else if(recv=="ok")
     {
@@ -1184,21 +1174,15 @@ void DeleteManager()
     }
 }
 
-void DissolveGroup()
+void DissolveGroup(string groupuid)
 {
-    GroupList();//先展示群聊列表
-
-    string groupuid;
-    cout<<"您想操作的群聊的uid为:"<<endl;
-    cin>>groupuid;
-
     cout<<"确定要解散群聊吗(yes/no)"<<endl;
     string choice;
     cin>>choice;
 
     if(choice=="yes")
     {
-        UserCommand command1(Curcommand.m_uid,"",groupuid,DISSOLVEGROUP,{""});
+        UserCommand command1(Curcommand.m_uid,"","",DISSOLVEGROUP,{groupuid});
         int ret = mysocket.SendMsg(Curcommand.To_Json());
         if (ret == 0||ret == -1)
         {
