@@ -276,6 +276,7 @@ int FriendList()
     }
 
     cout << "好友列表展示完毕,绿色表示好友在线" << endl;
+    cout<<"------------------------------------------------------------"<<endl;
 
     return 1;
 }
@@ -821,6 +822,7 @@ int GroupList()
     }
 
     cout << "群聊列表展示完毕" << endl;
+    cout<<"------------------------------------------------------------"<<endl;
 
     return 1;
 }
@@ -847,51 +849,55 @@ void AboutGroup()
         cin.clear(); // 清除输入流的错误状态
         cin.sync();  // 清空输入缓冲区
 
-        GroupList();//先展示群聊列表
-        string groupuid;
-        cout<<"您想查看详细信息的群聊uid为:"<<endl;
-        cin>>groupuid;
-
-        if(option!=8)
+        int flag=GroupList();//先展示群聊列表
+        if(flag==1)
         {
-            switch (option)
+            string groupuid;
+            cout<<"您想查看详细信息的群聊uid为:"<<endl;
+            cin>>groupuid;
+
+            if(option!=8)
             {
-                case 1:
-                    MemberList(groupuid);
-                    break;
-                case 2:
-                    DeleteGroup(groupuid);
-                    break;
-                case 3:
-                    ApplyList(groupuid);
-                    break;
-                /*case 4:
-                    AgreeAddMember();
-                    break;
-                case 5:
-                    RefuseAddMember();
-                    break;*/
-                case 4:
-                    DeleteMember(groupuid);
-                    break;
-                case 5:
-                    AddManager(groupuid);
-                    break;
-                case 6:
-                    DeleteManager(groupuid);
-                    break;
-                case 7:
-                    DissolveGroup(groupuid);
-                    break;
-                default:
-                system("clear");
-                    cout<<"输入错误,请重新输入"<<endl;
-                    continue;
+                switch (option)
+                {
+                    case 1:
+                        MemberList(groupuid);
+                        break;
+                    case 2:
+                        DeleteGroup(groupuid);
+                        break;
+                    case 3:
+                        ApplyList(groupuid);
+                        break;
+                    /*case 4:
+                        AgreeAddMember();
+                        break;
+                    case 5:
+                        RefuseAddMember();
+                        break;*/
+                    case 4:
+                        DeleteMember(groupuid);
+                        break;
+                    case 5:
+                        AddManager(groupuid);
+                        break;
+                    case 6:
+                        DeleteManager(groupuid);
+                        break;
+                    case 7:
+                        DissolveGroup(groupuid);
+                        break;
+                    default:
+                    system("clear");
+                        cout<<"输入错误,请重新输入"<<endl;
+                        continue;
+                }
+            }else{
+                break;
             }
         }else{
             break;
         }
-
     }
 }
 
@@ -919,8 +925,11 @@ void MemberList(string groupuid)//群成员列表
         }else{
             cout<<member<<endl;
         }
+
+        member=mysocket.RecvMsg();
     }
     cout<<"群成员列表展示完毕"<<endl;
+    cout<<"------------------------------------------------------------------"<<endl;
     return;
     
 }
@@ -980,9 +989,11 @@ void ApplyList(string groupuid)//申请加群列表
         {
             cout<<recv<<endl;
         }
+        recv=mysocket.RecvMsg();
     }
 
     cout<<"申请加群列表展示完毕"<<endl;
+    cout<<"------------------------------------------------------------------"<<endl;
 
     string agreeuid;
 
@@ -1042,7 +1053,7 @@ void ApplyList(string groupuid)//申请加群列表
                 cout<<"不存在该uid申请加群"<<endl;
             }else if(refuse_recv=="ok")
             {
-                cout<<"已成功通过该用户的加群申请"<<endl;
+                cout<<"已成功拒绝该用户的加群申请"<<endl;
             }else{
                 cout<<"其他错误"<<endl;
                 return;
