@@ -804,7 +804,7 @@ void GroupList(TcpSocket mysocket,UserCommand command)
     mysocket.SendMsg("end");
 }
 
-void AddGroup(TcpSocket mysocket,UserCommand command)
+void AddGroup(TcpSocket mysocket,UserCommand command)//功能好着呢
 {
     if(redis.hexists(command.m_option[0]+"群成员列表",command.m_uid))
     {
@@ -818,6 +818,9 @@ void AddGroup(TcpSocket mysocket,UserCommand command)
         mysocket.SendMsg("had");
     }else
     {
+        //在申请加群列表里添加信息
+        string msg="申请加入群聊";
+        redis.hsetValue(command.m_option[0]+"的申请加群列表",command.m_uid,msg);
         //int num=redis.getListCount(command.m_option[0],"的群成员列表");
 
         vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
@@ -826,7 +829,7 @@ void AddGroup(TcpSocket mysocket,UserCommand command)
         {
             if(redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群成员")
             {
-                string apply=command.m_uid+"申请加群"+command.m_option[0];
+                string apply=command.m_uid+"申请加入群聊"+command.m_option[0];
                 string num=redis.gethash(memberid+"的未读消息","群聊消息");
                 redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
                 redis.rpushValue(memberid+"群聊消息",apply);
@@ -845,21 +848,22 @@ void AddGroup(TcpSocket mysocket,UserCommand command)
     }
 }
 
-void MemberList(TcpSocket mysocket,UserCommand command)
+void MemberList(TcpSocket mysocket,UserCommand command)//bug已解决
 {
     if(!redis.hexists(command.m_uid+"的群聊列表",command.m_option[0]))
     {
         mysocket.SendMsg("none");
         return;
-    }else {
+    }
         vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
 
         for(const string& memberid:memberlist)
         {
-            mysocket.SendMsg(memberid);//一直循环打印
+            //cout<<memberid<<endl;
+            mysocket.SendMsg(memberid);
         }
         mysocket.SendMsg("end");
-    }
+    
 }
 
 void DeleteGroup(TcpSocket mysocket,UserCommand command)
@@ -915,7 +919,7 @@ void DeleteMember(TcpSocket mysocket,UserCommand command)
 
 }
 
-void AddManager(TcpSocket mysocket,UserCommand command)
+void AddManager(TcpSocket mysocket,UserCommand command)//功能暂时好着呢
 {
     if(!redis.hexists(command.m_uid+"的群聊列表",command.m_recvuid))
     {
