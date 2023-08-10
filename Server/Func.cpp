@@ -973,14 +973,18 @@ void DeleteManager(TcpSocket mysocket,UserCommand command)
 
 void DissolveGroup(TcpSocket mysocket,UserCommand command)
 {
-    if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群主")
+    if(redis.gethash(command.m_option[0]+"群成员列表",command.m_uid)!="群主")
     {
         mysocket.SendMsg("no");
         return;
     }
 
     redis.sremValue("群聊集合",command.m_option[0]);//将群聊从群聊集合中删除
-    redis.delKey(command.m_option[0]);//删除群聊信息
+    
+    //删除群聊信息
+    redis.delKey(command.m_option[0]+"的基本信息");
+    redis.delKey(command.m_option[0]+"的群聊消息");
+    redis.delKey(command.m_option[0]+"群成员列表");
 
     vector<string> memberlist=redis.getFriendList(command.m_option[0],"群成员列表");
 
@@ -992,7 +996,8 @@ void DissolveGroup(TcpSocket mysocket,UserCommand command)
         redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
         redis.rpushValue(memberid+"群聊消息",apply);
 
-        if(redis.sismember("在线用户列表",memberid))
+        //实时通知没有实现
+        if(redis.sismember("在线用户列表",memberid)&&redis.gethash(command.m_option[0]+"群成员列表",command.m_uid)!="群主")
         {
             string member_fd=redis.gethash(memberid,"通知套接字");
             TcpSocket membersocket(stoi(member_fd));
@@ -1000,6 +1005,7 @@ void DissolveGroup(TcpSocket mysocket,UserCommand command)
         }
         
     }
+    mysocket.SendMsg("ok");
 
 }
 
