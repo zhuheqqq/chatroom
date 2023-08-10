@@ -625,7 +625,7 @@ int ChatWithFriend()
             //cin.ignore();//忽略当前缓冲区中的内容
             //cin.sync();
             getline(cin,newmsg);
-            if(newmsg=="exit")//代表用户想退出聊天
+            if(newmsg==":exit")//代表用户想退出聊天
             {
                 //退出聊天
                 UserCommand command_exit(Curcommand.m_uid,"",recvuid,EXITCHAT,{""});
@@ -1218,7 +1218,7 @@ void DissolveGroup(string groupuid)
         }else if(recv=="ok")
         {
             system("clear");
-            cout<<"已成功解散此群聊"<<endl;
+            cout<<L_RED<<"已成功解散此群聊"<<NONE<<endl;
             return;
         }else{
             cout<<"其他错误"<<endl;
