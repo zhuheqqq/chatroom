@@ -37,7 +37,7 @@ void DeleteMember(string groupuid);//移除群成员
 void AddManager(string groupuid);//增加管理员
 void DeleteManager(string groupuid);//取消管理员身份
 void DissolveGroup(string groupuid);//解散群聊
-
+void ChatGroup(string groupuid);
 
 int main()
 {
@@ -856,7 +856,7 @@ void AboutGroup()
             cout<<"您想查看详细信息的群聊uid为:"<<endl;
             cin>>groupuid;
 
-            if(option!=8)
+            if(option!=9)
             {
                 switch (option)
                 {
@@ -886,6 +886,9 @@ void AboutGroup()
                         break;
                     case 7:
                         DissolveGroup(groupuid);
+                        break;
+                    case 8:
+                        ChatGroup(groupuid);
                         break;
                     default:
                     system("clear");
@@ -1228,5 +1231,98 @@ void DissolveGroup(string groupuid)
     }
 
 
+}
+
+void ChatGroup(string groupuid)
+{
+    UserCommand command1(Curcommand.m_uid,Curcommand.m_nickname,groupuid,CHATGROUP,{""});
+    int ret=mysocket.SendMsg(command1.To_Json());
+    if(ret==0||ret==-1)
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }
+
+    string recv=mysocket.RecvMsg();
+    if(recv=="close")
+    {
+        cout<<"服务器端已关闭"<<endl;
+        exit(0);
+    }else if(recv=="no")
+    {
+        cout<<"您还未加入该群,请先加入该群"<<endl;
+    }else if(recv=="ok")
+    {
+        //打印群聊历史聊天记录
+        string historymsg;
+        while(1)
+        {
+            historymsg=mysocket.RecvMsg();
+            if(historymsg=="close")
+            {
+                cout<<"服务器端已关闭"<<endl;
+                exit(0);
+            }else if(historymsg=="历史聊天记录打印完毕")
+            {
+                break;
+            }else{
+                cout<<historymsg<<endl;
+            }
+        }
+
+        string newmsg;
+        while(1)
+        {
+            getline(cin,newmsg);
+            if(newmsg==":exit")
+            {
+                //退出聊天
+                UserCommand command_exit(Curcommand.m_uid,"",groupuid,EXITCHATGROUP,{""});
+                int ret=mysocket.SendMsg(command_exit.To_Json());
+                if(ret==0||ret==-1)
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    exit(0);
+
+                }
+
+                string recv=mysocket.RecvMsg();
+                if(recv=="close")
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    exit(0);
+                }else if(recv=="ok")
+                {
+                    cout<<"已成功退出聊天"<<endl;
+                    return;
+                }else{
+                    cout<<"其他错误"<<endl;
+                    return;
+                }
+
+                break;
+            }
+
+            //包装消息
+            UserCommand command_msg(Curcommand.m_uid,"",groupuid,CHATSENDMSG,{newmsg});
+            int ret=mysocket.SendMsg(command_msg.To_Json());
+            if(ret==0||ret==-1)
+            {
+                cout<<"服务器端已关闭"<<endl;
+                exit(0);
+            }
+
+            string recv=mysocket.RecvMsg();
+            if(recv=="close")
+            {
+                cout<<"服务器端已关闭"<<endl;
+                exit(0);
+            }else if(recv=="ok")
+            {
+                continue;
+            }
+        }
+    }
+    return;
 }
 
