@@ -28,6 +28,9 @@
 #define ADDMANAGER 25
 #define DELETEMANAGER 26
 #define DISSOLVEGROUP 27
+#define CHATGROUP 28
+#define CHATSENDMSG 29
+#define EXITCHATGROUP 30
 
 
 // ANSI 转义码设置文本颜色
