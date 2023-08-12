@@ -16,6 +16,7 @@ using namespace std;
 extern UserCommand Curcommand;
 TcpSocket mysocket("recv");
 
+
 struct RecvArg{
     string uid;
     int recv_fd=-1;
@@ -32,6 +33,7 @@ void Sign_menu();
 int Login();
 int Log_in(TcpSocket mysocket);
 int Sign_up(TcpSocket mysocket);
+int Pass_re(TcpSocket mysocket);//找回密码函数
 string get_uid();
 void Func_menu();
 
@@ -75,8 +77,9 @@ void *recvfunc(void *arg)//线程处理函数
 //信号处理函数
 void setup()
 {
-    //signal(SIGINT,SIG_IGN);//忽略ctrl+c信号
-    signal(SIGQUIT,SIG_IGN);//忽略ctrl+d信号
+    signal(SIGINT,SIG_IGN);//忽略ctrl+c信号
+    signal(SIGQUIT,SIG_IGN);//忽略ctrl+\信号
+    signal(SIGTSTP, SIG_IGN);//忽略ctrl+z信号
 }
 
 //获取用户的uid
@@ -157,6 +160,11 @@ int Login()
             
         }else if(choice==3)
         {
+            //和密保问题作对比
+            Pass_re(mysocket);
+
+        }else if(choice==4)
+        {
             exit(0);
 
         }else{
@@ -171,13 +179,13 @@ int Login()
 int Sign_up(TcpSocket mysocket)//注册
 {
     string pwd,pwd2;//密码
-    string nickname;//昵称
+    string security_question;//密保问题
 
     while(1){
-        cin.ignore();//忽略缓冲区多余字符   
+        cin.ignore();//忽略缓冲区多余字符 
 
-        cout<<"请输入昵称:"<<endl;
-        getline(cin,nickname);    
+        //cout<<"请输入昵称:"<<endl;
+        //getline(cin,nickname);  
 
         //cin.ignore();//忽略缓冲区多余字符 
         
@@ -204,8 +212,12 @@ int Sign_up(TcpSocket mysocket)//注册
         
     }
 
+    cout<<"请回答下列问题，答案将作为您的密保问题"<<endl;
+    cout<<"您最喜欢的书叫什么名字？"<<endl;
+    getline(cin,security_question);
 
-    UserCommand command("",nickname,"",SIGNUP,{pwd});//假设SIGNUP为让服务器随机生成一个uid
+
+    UserCommand command("",security_question,"",SIGNUP,{pwd});//假设SIGNUP为让服务器随机生成一个uid
     int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
     if(ret==0||ret==-1)
     {
@@ -219,7 +231,7 @@ int Sign_up(TcpSocket mysocket)//注册
         exit(0);
     }
     Curcommand.m_uid=uid;
-    Curcommand.m_nickname=nickname;
+    Curcommand.m_question=security_question;
     cout<<"您注册的uid为:"<<uid<<",这是您身份的唯一标识,请牢记"<<endl;
 
     cout<<"请登陆"<<endl;
@@ -277,6 +289,64 @@ int Log_in(TcpSocket mysocket)//登陆
     }
 
    
+    return 1;
+
+}
+
+int Pass_re(TcpSocket mysocket)
+{
+    string uid,pwd,answer;
+    uid=get_uid();
+    Curcommand.m_uid=uid;
+
+    cout<<"您最喜欢的书叫什么名字？"<<endl;
+    getline(cin,answer);
+
+    UserCommand command(uid,"","",PASSWORDRECOVERY,{""});
+    int ret=mysocket.SendMsg(command.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
+    if(ret==0||ret==-1)
+    {
+        cout<<"服务器已关闭"<<endl;
+        exit(0);
+    }
+
+    string recv=mysocket.RecvMsg();//接收返回的结果
+    if(recv=="close")//接收服务器端返回的字符打印提示信息
+    {
+        cout<<"服务器已关闭"<<endl;
+        exit(0);
+       
+    }else if(recv!=answer)
+    {
+        cout<<"您输入的答案不正确,无法进行下面的操作"<<endl;
+        return 0;
+    }else if(recv==answer)
+    {
+        cout<<"请输入您想修改的密码:"<<endl;
+        cin>>pwd;
+        UserCommand command1(uid,"","",CHANGEPASSWORD,{pwd});
+        int ret=mysocket.SendMsg(command1.To_Json());//命令类转换为json格式，再转换为字符串格式，最后由套接字发送
+        if(ret==0||ret==-1)
+        {
+            cout<<"服务器已关闭"<<endl;
+            exit(0);
+        }
+
+        string recv=mysocket.RecvMsg();//接收返回的结果
+        if(recv=="close")//接收服务器端返回的字符打印提示信息
+        {
+            cout<<"服务器已关闭"<<endl;
+            exit(0);
+        
+        }else if(recv=="ok")
+        {
+            cout<<"密码已成功修改,请重新登陆"<<endl;
+            return 1;
+        }else{
+            cout<<"其他错误"<<endl;
+            return 0;
+        }
+    }
     return 1;
 
 }
