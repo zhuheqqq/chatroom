@@ -31,6 +31,8 @@
 #define CHATGROUP 28
 #define CHATSENDMSG 29
 #define EXITCHATGROUP 30
+#define PASSWORDRECOVERY 31
+#define CHANGEPASSWORD 32
 
 
 // ANSI 转义码设置文本颜色
