@@ -130,13 +130,12 @@ int Login()
     
     while(1)
     {
-        int choice;
-
         Sign_menu();
 
+        string option;
         cout<<"请输入您的选项:"<<endl;
-        cin>>choice;
-
+        cin>>option;
+       
         if(cin.eof())//检查是否到达文件结尾即有ctrl+d信号的出现
         {
             cout << "Reached the end of the input" << endl;
@@ -147,23 +146,24 @@ int Login()
         cin.clear();//清除输入流的错误状态
         cin.sync();//清空输入缓冲区
 
-        if(choice==1)
+
+        if(option=="1")
         {
             Sign_up(mysocket);
 
-        }else if(choice==2)
+        }else if(option=="2")
         {
             flag=Log_in(mysocket);
             if(flag==1){
                 break;
             }
             
-        }else if(choice==3)
+        }else if(option=="3")
         {
             //和密保问题作对比
             Pass_re(mysocket);
 
-        }else if(choice==4)
+        }else if(option=="4")
         {
             exit(0);
 
@@ -260,6 +260,7 @@ int Log_in(TcpSocket mysocket)//登陆
     }
 
     string recv=mysocket.RecvMsg();//接收返回的结果
+    cout<<recv<<endl;
     if(recv=="close")//接收服务器端返回的字符打印提示信息
     {
         cout<<"服务器已关闭"<<endl;
