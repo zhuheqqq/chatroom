@@ -1,6 +1,7 @@
 #include "Menu.hpp"
 #include "Sign.cpp"
 #include<chrono>
+#include<fcntl.h>
 #include "../Server/wrap.hpp"
 #include "../Classes/TcpSocket.hpp"
 #include "../Classes/UserCommand.hpp"
@@ -638,7 +639,8 @@ int ChatWithFriend()
                 exit(0);
             }else if(historymsg=="历史聊天记录展示完毕")//未打印
             {
-                cout<<"输入:exit退出聊天"<<endl;
+                cout<<"------------------------------------------------------------------"<<endl;
+                cout<<L_PRED<<"输入:exit退出聊天,输入:#发送文件,输入:&接收文件"<<NONE<<endl;
                 cout<<"------------------------------------------------------------------"<<endl;
                 break;
             }else{
@@ -679,6 +681,30 @@ int ChatWithFriend()
                 }
 
                 break;
+            }
+
+            if(newmsg==":#")
+            {
+                //获得文件的路径 打开文件 存储文件信息 提取文件名
+
+                string filepath;//文件路径
+
+                cout<<"请输入您要发送文件的绝对路径:"<<endl;
+                getline(cin,filepath);
+
+                int filefd=open(filepath.c_str(),O_RDONLY);
+                if(filefd==-1)
+                {
+                    cerr<<"Error opening file"<<endl;
+                }else{
+                    struct stat statbuf;
+                    
+                    size_t lastSlash=filepath.find_last_of("/\\");//找到最后一个斜杠或者反斜杠
+                    string filename=filepath.substr(lastSlash+1);//获取到文件名
+                }
+
+
+
             }
 
             //包装消息
@@ -985,6 +1011,10 @@ void DeleteGroup(string groupuid)
     }else if(recv=="none")
     {
         cout<<"您不在此群聊中"<<endl;
+        return;
+    }else if(recv=="no")
+    {
+        cout<<"您是该群的群主,无法退群"<<endl;
         return;
     }else if(recv=="ok")
     {
