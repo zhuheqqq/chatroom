@@ -902,11 +902,15 @@ void MemberList(TcpSocket mysocket,UserCommand command)//bug已解决
     
 }
 
-void DeleteGroup(TcpSocket mysocket,UserCommand command)
+void DeleteGroup(TcpSocket mysocket,UserCommand command)//需要加上群主不能退群的功能
 {
     if(!redis.hexists(command.m_uid+"的群聊列表",command.m_option[0]))
     {
         mysocket.SendMsg("none");
+        return;
+    }else if(redis.gethash(command.m_option[0]+"群成员列表",command.m_uid)=="群主")
+    {
+        mysocket.SendMsg("no");
         return;
     }
 
