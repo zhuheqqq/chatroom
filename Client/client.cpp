@@ -878,12 +878,14 @@ void AboutGroup()
         int flag=GroupList();//先展示群聊列表
         if(flag==1)
         {
-            string groupuid;
-            cout<<"您想查看详细信息的群聊uid为:"<<endl;
-            cin>>groupuid;
 
             if(option!=9)
             {
+
+                string groupuid;
+                cout<<"您想查看详细信息的群聊uid为:"<<endl;
+                cin>>groupuid;
+
                 switch (option)
                 {
                     case 1:
