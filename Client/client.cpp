@@ -638,6 +638,8 @@ int ChatWithFriend()
                 exit(0);
             }else if(historymsg=="历史聊天记录展示完毕")//未打印
             {
+                cout<<"输入:exit退出聊天"<<endl;
+                cout<<"------------------------------------------------------------------"<<endl;
                 break;
             }else{
                 cout<<historymsg<<endl;
