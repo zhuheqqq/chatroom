@@ -158,6 +158,9 @@ void task(void *arg)
         case CHATSENDMSG:
             GroupSendMsg(mysocket,command);
             break;
+        case EXITCHATGROUP:
+            ExitChatGroup(mysocket,command);
+            break;
     }
 
     return;
@@ -651,6 +654,7 @@ void UnreadMessage(TcpSocket mysocket,UserCommand command)
     if(num2==0)
     {
         mysocket.SendMsg("no");
+        return;
     }else{
         response="您有"+to_string(num2)+"条未读消息:\n";
 
@@ -930,7 +934,7 @@ void DeleteMember(TcpSocket mysocket,UserCommand command)
 
     for(const string& memberid:memberlist)
     {
-        if(redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群成员")
+        if(redis.gethash(command.m_recvuid+"群成员列表",memberid)!="群成员")
         {
             string apply=command.m_uid+"将"+command.m_option[0]+"移除群聊"+command.m_recvuid;
             string num=redis.gethash(memberid+"的未读消息","群聊消息");
