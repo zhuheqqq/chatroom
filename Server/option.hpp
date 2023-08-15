@@ -33,6 +33,8 @@
 #define EXITCHATGROUP 30
 #define PASSWORDRECOVERY 31
 #define CHANGEPASSWORD 32
+#define SENDFILE 33
+#define RECVFILE 34
 
 
 // ANSI 转义码设置文本颜色

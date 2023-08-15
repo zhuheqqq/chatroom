@@ -10,6 +10,8 @@
 #include<sys/epoll.h>
 #include <csignal>
 #include <unordered_set>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
 
 using namespace std;
 Redis redis;
@@ -55,6 +57,8 @@ void RefuseAddMember(TcpSocket mysocket,UserCommand command);//拒绝加群
 void ChatGroup(TcpSocket mysocket,UserCommand command);
 void GroupSendMsg(TcpSocket mysocket,UserCommand command);
 void ExitChatGroup(TcpSocket mysocket,UserCommand command);
+void SendFile(TcpSocket mysocket,UserCommand command);
+void RecvFile(TcpSocket mysocket,UserCommand command);
 
 
 void task(void *arg)
@@ -161,6 +165,13 @@ void task(void *arg)
         case EXITCHATGROUP:
             ExitChatGroup(mysocket,command);
             break;
+        case SENDFILE:
+            SendFile(mysocket,command);
+            break;
+        case RECVFILE:
+            RecvFile(mysocket,command);
+            break;
+
     }
 
     return;
@@ -1218,4 +1229,124 @@ void ExitChatGroup(TcpSocket mysocket,UserCommand command)
     redis.hsetValue(command.m_uid,"聊天对象","0");
     mysocket.SendMsg("ok");
     return ;
+}
+
+void SendFile(TcpSocket mysocket,UserCommand command)
+{
+    string filename=command.m_option[0];//获得文件名
+    size_t filesize=stoul(command.m_option[1]);//转换字符串为无符号整型
+
+    string savepath="/home/zhuheqin/clone/chatroom/file/";//保存文件的路径
+    string fullfilepath=savepath+filename;
+
+    // 创建目录
+    int mkdirStatus = mkdir(savepath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    if (mkdirStatus != 0 && errno != EEXIST) {
+        cerr << "Error creating directory: " << strerror(errno) << endl;
+        //mysocket.SendMsg("close");
+        //return;
+    }
+
+    int filefd = open(fullfilepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    if (filefd == -1) {
+        cerr << "Error opening file for writing" << endl;
+        mysocket.SendMsg("close");
+        return;
+    }
+
+    off_t offset=0;
+    ssize_t totalRecvByte=0;
+
+    while(filesize>totalRecvByte)
+    {
+        ssize_t byteRead=sendfile(filefd,mysocket.getfd(),&offset,filesize-totalRecvByte);
+        if(byteRead==-1)
+        {
+            cerr << "Error sending file content" << endl;
+            break;
+        }
+        totalRecvByte+=byteRead;
+    }
+
+    close(filefd);
+
+    mysocket.SendMsg("ok");
+
+    //将新的消息加入消息队列
+    string newmsg="我:发送了一个文件"+command.m_option[0];
+    redis.rpushValue(command.m_uid+"和"+command.m_recvuid+"的聊天记录",newmsg);
+
+
+    //在发送者的页面展示消息
+    string my_recvfd=redis.gethash(command.m_uid,"通知套接字");
+    TcpSocket my_socket(stoi(my_recvfd));
+    my_socket.SendMsg(L_WHITE + newmsg + NONE);
+
+    //被好友屏蔽
+    if(redis.sismember(command.m_recvuid+"的屏蔽列表",command.m_uid))
+    {
+        string msg="您的消息已发出,但被对方拒收了";
+        my_socket.SendMsg(L_RED+msg+NONE);
+        mysocket.SendMsg("no");
+        return;
+        
+    }
+    string uid=command.m_uid;
+    string msg1=uid+":发送了一个文件"+command.m_option[0];
+    redis.rpushValue(command.m_recvuid+"和"+command.m_uid+"的聊天记录",msg1);
+    
+
+    //好友此时在线并且在和我聊天
+    if(redis.sismember("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
+    {
+        string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
+        TcpSocket fr_socket(stoi(fr_recvfd));
+        fr_socket.SendMsg(L_GREEN+msg1+NONE);
+
+    }else if(!redis.sismember("在线用户列表",command.m_recvuid))//好友不在线
+    {
+        string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
+        redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
+        redis.rpushValue(command.m_recvuid+"的通知消息",command.m_uid+"给您发来了一个文件");
+
+    }else{
+        string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
+        TcpSocket fr_socket(stoi(fr_recvfd));
+        fr_socket.SendMsg(L_RED+command.m_uid+"给您发来了一个文件"+NONE);
+    }
+
+
+    mysocket.SendMsg("ok");
+    return;
+}
+
+void RecvFile(TcpSocket mysocket,UserCommand command)
+{
+    string filename = command.m_option[0];
+
+    string savepath = "/home/zhuheqin/clone/chatroom/file/";
+    string fullfilepath = savepath + filename;
+
+    int filefd = open(fullfilepath.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+    if (filefd == -1) {
+        cerr << "Error opening file for writing" << endl;
+        mysocket.SendMsg("close");
+        return;
+    }else{
+        struct stat statbuf;
+        fstat(filefd,&statbuf);
+        int ret=mysocket.SendMsg(to_string(statbuf.st_size));
+        if(ret==0||ret==-1)
+        {
+            cout<<"已关闭"<<endl;
+            exit(0);
+        }
+
+        sendfile(mysocket.getfd(),filefd,NULL,statbuf.st_size);
+        close(filefd);
+    }
+
+    close(filefd);
+
+    mysocket.SendMsg("ok");
 }
