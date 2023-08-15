@@ -139,8 +139,10 @@ int Login()
         if(cin.eof())//检查是否到达文件结尾即有ctrl+d信号的出现
         {
             cout << "Reached the end of the input" << endl;
-
+            //cin.ignore();
+            
             return 0;
+
         }
 
         cin.clear();//清除输入流的错误状态
@@ -232,7 +234,7 @@ int Sign_up(TcpSocket mysocket)//注册
     }
     Curcommand.m_uid=uid;
     Curcommand.m_question=security_question;
-    cout<<"您注册的uid为:"<<uid<<",这是您身份的唯一标识,请牢记"<<endl;
+    cout<<L_RED<<"您注册的uid为:"<<uid<<",这是您身份的唯一标识,请牢记"<<NONE<<endl;
 
     cout<<"请登陆"<<endl;
 

@@ -2,6 +2,8 @@
 #include "Sign.cpp"
 #include<chrono>
 #include<fcntl.h>
+#include <sys/stat.h>
+#include <sys/sendfile.h>
 #include "../Server/wrap.hpp"
 #include "../Classes/TcpSocket.hpp"
 #include "../Classes/UserCommand.hpp"
@@ -64,9 +66,11 @@ int main()
             if (cin.eof()) // 检查是否到达文件结尾即有ctrl+d信号的出现
             {
                 cout << "Reached the end of the input" << endl;
+                //continue;
                 return 0;
             }
 
+            
             system("clear");
 
             cin.clear(); // 清除输入流的错误状态
@@ -115,6 +119,7 @@ int FriendManage()
         if (cin.eof()) // 检查是否到达文件结尾即有ctrl+d信号的出现
         {
             cout << "Reached the end of the input" << endl;
+            //break;
             return 0;
         }
 
@@ -195,6 +200,7 @@ void GroupManage()
         if (cin.eof()) // 检查是否到达文件结尾即有ctrl+d信号的出现
         {
             cout << "Reached the end of the input" << endl;
+            //break;
             return;
         }
 
@@ -698,12 +704,94 @@ int ChatWithFriend()
                     cerr<<"Error opening file"<<endl;
                 }else{
                     struct stat statbuf;
-                    
+                    fstat(filefd,&statbuf);//将与给定文件描述符关联的文件状态信息填充到statbuf结构体中
+
                     size_t lastSlash=filepath.find_last_of("/\\");//找到最后一个斜杠或者反斜杠
                     string filename=filepath.substr(lastSlash+1);//获取到文件名
+
+                    UserCommand command_file(Curcommand.m_uid,"",recvuid,SENDFILE,{filename,to_string(statbuf.st_size)});
+                    int ret=mysocket.SendMsg(command_file.To_Json());
+                    if(ret==0||ret==-1)
+                    {
+                        cout<<"服务器端已关闭"<<endl;
+                        exit(0);
+                    }
+
+                    string recv_file=mysocket.RecvMsg();
+                    if(recv_file=="close")
+                    {
+                        cout<<"服务器端已关闭"<<endl;
+                        exit(0);
+                    }
+
+                    sendfile(mysocket.getfd(),filefd,NULL,statbuf.st_size);
+                    close(filefd);
                 }
 
+                string recv=mysocket.RecvMsg();
+                if(recv=="close")
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                }else if(recv=="ok")
+                {
+                    cout<<"文件上传成功"<<endl;
+                }
 
+                continue;
+            }
+
+            //接收文件
+            if(newmsg==":&")
+            {
+                string filepath;
+
+                cout<<"请输入您想保存文件的位置:"<<endl;
+                getline(cin,filepath);
+
+                size_t lastSlash=filepath.find_last_of("/\\");//找到最后一个斜杠或者反斜杠
+                string filename=filepath.substr(lastSlash+1);//获取到文件名
+
+                UserCommand command_file(Curcommand.m_uid,"",recvuid,RECVFILE,{filename});
+                int ret=mysocket.SendMsg(command_file.To_Json());
+                if(ret==0||ret==-1)
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    exit(0);
+                }
+
+                string recv_file=mysocket.RecvMsg();
+                if(recv_file=="close")
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    exit(0);
+                }else if(recv_file=="no")
+                {
+                    cout<<"您暂时还没有未接收的文件"<<endl;
+                    continue;
+                }else{
+                    int filefd=open(filepath.c_str(),O_APPEND|O_WRONLY);
+                    unsigned long size=atoi(recv_file.c_str());//文件大小
+                    char buf[8192];//缓冲区
+
+                    if(filefd==-1)
+                    {
+                        cerr<<"Error opening file"<<endl;
+                    }else{
+                        while(unsigned long i=read(mysocket.getfd(),buf,8192)>0)
+                        {
+                            unsigned long num=write(filefd,buf,i);//从缓冲区里读数据
+                            size-=num;
+                            if(size==0)
+                            {
+                                break;
+                            }
+                        }
+                        cout<<L_RED<<"文件接收完毕"<<NONE<<endl;
+                        close(filefd);
+
+                        continue;
+                    }
+                }
 
             }
 
