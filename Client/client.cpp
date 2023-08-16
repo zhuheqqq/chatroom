@@ -42,13 +42,13 @@ void DeleteManager(string groupuid);//取消管理员身份
 void DissolveGroup(string groupuid);//解散群聊
 void ChatGroup(string groupuid);
 
-int main()
+int main(int argc,char **argv)
 {
     //UserCommand Curcommand;
 
     setup();
 
-    mysocket.ConnectToHost("127.0.0.1", 9999);
+    mysocket.ConnectToHost(IP, PORT);
 
     int ret = Login();
     if (ret == 1)
@@ -654,6 +654,7 @@ int ChatWithFriend()
             }
         }
 
+        cin.ignore();
         //获取新的聊天会话
         string newmsg;
         while(1)
@@ -702,6 +703,7 @@ int ChatWithFriend()
                 if(filefd==-1)
                 {
                     cerr<<"Error opening file"<<endl;
+                    return 0;
                 }else{
                     struct stat statbuf;
                     fstat(filefd,&statbuf);//将与给定文件描述符关联的文件状态信息填充到statbuf结构体中
@@ -722,9 +724,15 @@ int ChatWithFriend()
                     {
                         cout<<"服务器端已关闭"<<endl;
                         exit(0);
+                    }else if(recv_file=="ok")
+                    {
+                        //cout<<"已成功发送上传文件的请求"<<endl;
+                        int ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
+                        if (ret == -1) {
+                            cerr << "Error sending file data: " << strerror(errno) << endl;
+                        }
                     }
 
-                    sendfile(mysocket.getfd(),filefd,NULL,statbuf.st_size);
                     close(filefd);
                 }
 
@@ -732,11 +740,12 @@ int ChatWithFriend()
                 if(recv=="close")
                 {
                     cout<<"服务器端已关闭"<<endl;
+                    return 0;
                 }else if(recv=="ok")
                 {
-                    cout<<"文件上传成功"<<endl;
+                    cout<<L_RED<<"文件上传成功"<<NONE<<endl;
                 }
-
+                
                 continue;
             }
 
@@ -769,28 +778,52 @@ int ChatWithFriend()
                     cout<<"您暂时还没有未接收的文件"<<endl;
                     continue;
                 }else{
-                    int filefd=open(filepath.c_str(),O_APPEND|O_WRONLY);
-                    unsigned long size=atoi(recv_file.c_str());//文件大小
-                    char buf[8192];//缓冲区
-
-                    if(filefd==-1)
+                    int filefd=open(filepath.c_str(),O_APPEND|O_WRONLY|O_CREAT,S_IRWXU);
+                     if(filefd==-1)
                     {
-                        cerr<<"Error opening file"<<endl;
-                    }else{
-                        while(unsigned long i=read(mysocket.getfd(),buf,8192)>0)
-                        {
-                            unsigned long num=write(filefd,buf,i);//从缓冲区里读数据
-                            size-=num;
-                            if(size==0)
-                            {
-                                break;
-                            }
-                        }
-                        cout<<L_RED<<"文件接收完毕"<<NONE<<endl;
-                        close(filefd);
-
-                        continue;
+                        cerr<<"Error opening file:"<<strerror(errno)<<endl;
+                        return 0;
                     }
+                    ssize_t size=atoi(recv_file.c_str());//文件大小
+                    char buf[4096];//缓冲区
+                    ssize_t totalRecvByte=0;
+
+                    while(size>totalRecvByte)
+                    {
+                        ssize_t byteRead=read(mysocket.getfd(),buf,sizeof(buf));//会返回-1
+                        if (byteRead == -1) {
+                            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+                            {
+                                continue;
+                            }else{
+                                cerr << "Error reading file: " << strerror(errno) << endl;
+                            }
+                            
+                        }
+
+                        if (byteRead == 0) {
+                            cerr << "Connection closed by client" << endl;
+                            break;
+                        }
+
+                        ssize_t byteWritten=write(filefd,buf,byteRead);
+                        if (byteWritten == -1) {
+                            cerr << "Error writing to file" << endl;
+                            break;
+                        }
+
+                        totalRecvByte+=byteWritten;
+                    }
+
+                    close(filefd);
+
+                    if(mysocket.RecvMsg()=="ok")
+                    {
+                        cout<<L_RED<<"文件接收完毕"<<NONE<<endl;
+                    }
+
+                    continue;
+        
                 }
 
             }
@@ -1412,11 +1445,16 @@ void ChatGroup(string groupuid)
                 exit(0);
             }else if(historymsg=="历史聊天记录打印完毕")
             {
+                cout<<"------------------------------------------------------------------"<<endl;
+                cout<<L_PRED<<"输入:exit退出聊天,输入:#发送文件,输入:&接收文件"<<NONE<<endl;
+                cout<<"------------------------------------------------------------------"<<endl;
                 break;
             }else{
                 cout<<historymsg<<endl;
             }
         }
+
+        cin.ignore();
 
         string newmsg;
         while(1)
@@ -1449,6 +1487,144 @@ void ChatGroup(string groupuid)
                 }
 
                 break;
+            }
+
+            if(newmsg==":#")
+            {
+                //获得文件的路径 打开文件 存储文件信息 提取文件名
+
+                string filepath;//文件路径
+
+                cout<<"请输入您要发送文件的绝对路径:"<<endl;
+                getline(cin,filepath);
+
+                int filefd=open(filepath.c_str(),O_RDONLY);
+                if(filefd==-1)
+                {
+                    cerr<<"Error opening file"<<endl;
+                    return ;
+                }else{
+                    struct stat statbuf;
+                    fstat(filefd,&statbuf);//将与给定文件描述符关联的文件状态信息填充到statbuf结构体中
+
+                    size_t lastSlash=filepath.find_last_of("/\\");//找到最后一个斜杠或者反斜杠
+                    string filename=filepath.substr(lastSlash+1);//获取到文件名
+
+                    UserCommand command_file(Curcommand.m_uid,"",groupuid,SENDFILEGROUP,{filename,to_string(statbuf.st_size)});
+                    int ret=mysocket.SendMsg(command_file.To_Json());
+                    if(ret==0||ret==-1)
+                    {
+                        cout<<"服务器端已关闭"<<endl;
+                        exit(0);
+                    }
+
+                    string recv_file=mysocket.RecvMsg();
+                    if(recv_file=="close")
+                    {
+                        cout<<"服务器端已关闭"<<endl;
+                        exit(0);
+                    }else if(recv_file=="ok")
+                    {
+                        //cout<<"已成功发送上传文件的请求"<<endl;
+                        int ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
+                        if (ret == -1) {
+                            cerr << "Error sending file data: " << strerror(errno) << endl;
+                        }
+                    }
+
+                    close(filefd);
+                }
+
+                string recv=mysocket.RecvMsg();
+                if(recv=="close")
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    return ;
+                }else if(recv=="ok")
+                {
+                    cout<<L_RED<<"文件上传成功"<<NONE<<endl;
+                }
+                
+                continue;
+            }
+
+            //接收文件
+            if(newmsg==":&")
+            {
+                string filepath;
+
+                cout<<"请输入您想保存文件的位置:"<<endl;
+                getline(cin,filepath);
+
+                size_t lastSlash=filepath.find_last_of("/\\");//找到最后一个斜杠或者反斜杠
+                string filename=filepath.substr(lastSlash+1);//获取到文件名
+
+                UserCommand command_file(Curcommand.m_uid,"",groupuid,RECVFILEGROUP,{filename});
+                int ret=mysocket.SendMsg(command_file.To_Json());
+                if(ret==0||ret==-1)
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    exit(0);
+                }
+
+                string recv_file=mysocket.RecvMsg();
+                if(recv_file=="close")
+                {
+                    cout<<"服务器端已关闭"<<endl;
+                    exit(0);
+                }else if(recv_file=="no")
+                {
+                    cout<<"您暂时还没有未接收的文件"<<endl;
+                    continue;
+                }else{
+                    int filefd=open(filepath.c_str(),O_APPEND|O_WRONLY|O_CREAT,S_IRWXU);
+                     if(filefd==-1)
+                    {
+                        cerr<<"Error opening file:"<<strerror(errno)<<endl;
+                        return ;
+                    }
+                    ssize_t size=atoi(recv_file.c_str());//文件大小
+                    char buf[4096];//缓冲区
+                    ssize_t totalRecvByte=0;
+
+                    while(size>totalRecvByte)
+                    {
+                        ssize_t byteRead=read(mysocket.getfd(),buf,sizeof(buf));//会返回-1
+                        if (byteRead == -1) {
+                            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+                            {
+                                continue;
+                            }else{
+                                cerr << "Error reading file: " << strerror(errno) << endl;
+                            }
+                            
+                        }
+
+                        if (byteRead == 0) {
+                            cerr << "Connection closed by client" << endl;
+                            break;
+                        }
+
+                        ssize_t byteWritten=write(filefd,buf,byteRead);
+                        if (byteWritten == -1) {
+                            cerr << "Error writing to file" << endl;
+                            break;
+                        }
+
+                        totalRecvByte+=byteWritten;
+                    }
+
+                    close(filefd);
+
+                    //if(mysocket.RecvMsg()=="ok")
+                    //{
+                        cout<<L_RED<<"文件接收完毕"<<NONE<<endl;
+                    //}
+
+                    continue;
+        
+                }
+
             }
 
             //包装消息

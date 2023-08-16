@@ -41,7 +41,7 @@ void *recvfunc(void *arg)//线程处理函数
 {
     RecvArg *recv_arg=static_cast<RecvArg*>(arg);//类型转换
     TcpSocket recvsocket(recv_arg->recv_fd);
-    recvsocket.ConnectToHost("127.0.0.1",9999);
+    recvsocket.ConnectToHost(IP,PORT);
     UserCommand command(recv_arg->uid,"","",RECV,{""});//表示接收实时通知
     //cout<<"5"<<endl;
     int ret=recvsocket.SendMsg(command.To_Json());
@@ -140,6 +140,7 @@ int Login()
         {
             cout << "Reached the end of the input" << endl;
             //cin.ignore();
+            //continue;
             
             return 0;
 
