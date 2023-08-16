@@ -51,7 +51,7 @@ int main(int argc,char **argv)
     char *buf;
     unsigned long port=strtoul(argv[2],&buf,20);
 
-    mysocket.ConnectToHost(argv[1],9999);
+    mysocket.ConnectToHost(argv[1],static_cast<unsigned short>(port));
 
     int ret = Login();
     if (ret == 1)
