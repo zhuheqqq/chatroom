@@ -196,7 +196,7 @@ int main()
     struct sockaddr_in saddr,caddr;
     saddr.sin_family=AF_INET;
     saddr.sin_port=htons(PORT);
-    saddr.sin_addr.s_addr=htonl(INADDR_ANY);
+    saddr.sin_addr.s_addr=0;
 
     //创建套接字
     lfd=Socket(AF_INET,SOCK_STREAM,0);
