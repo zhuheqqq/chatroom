@@ -42,17 +42,17 @@ void DeleteManager(string groupuid);//取消管理员身份
 void DissolveGroup(string groupuid);//解散群聊
 void ChatGroup(string groupuid);
 
-int main()
+int main(int argc,char **argv)
 {
     //UserCommand Curcommand;
 
     setup();
 
-    //char *buf;
-    //unsigned long port=strtoul(argv[2],&buf,20);
+    char *buf;
+    unsigned long port=strtoul(argv[2],&buf,20);
 
-    //mysocket.ConnectToHost(argv[1],static_cast<unsigned short>(port));
-    mysocket.ConnectToHost("0.0.0.0",9999);
+    mysocket.ConnectToHost(argv[1],static_cast<unsigned short>(port));
+    //mysocket.ConnectToHost("0.0.0.0",9999);
 
     int ret = Login();
     if (ret == 1)
