@@ -54,11 +54,13 @@ void DissolveGroup(TcpSocket mysocket,UserCommand command);//解散群聊
 void ApplyList(TcpSocket mysocket,UserCommand command);//申请加群列表
 void AgreeAddMember(TcpSocket mysocket,UserCommand command);//同意加群
 void RefuseAddMember(TcpSocket mysocket,UserCommand command);//拒绝加群
-void ChatGroup(TcpSocket mysocket,UserCommand command);
-void GroupSendMsg(TcpSocket mysocket,UserCommand command);
-void ExitChatGroup(TcpSocket mysocket,UserCommand command);
-void SendFile(TcpSocket mysocket,UserCommand command);
-void RecvFile(TcpSocket mysocket,UserCommand command);
+void ChatGroup(TcpSocket mysocket,UserCommand command);//群聊请求
+void GroupSendMsg(TcpSocket mysocket,UserCommand command);//群聊
+void ExitChatGroup(TcpSocket mysocket,UserCommand command);//退出聊天
+void SendFile(TcpSocket mysocket,UserCommand command);//发送文件
+void RecvFile(TcpSocket mysocket,UserCommand command);//接收文件
+void SendFileGroup(TcpSocket mysocket,UserCommand command);//群聊中发送文件
+void RecvFileGroup(TcpSocket mysocket,UserCommand command);//群聊中接收文件
 
 
 void task(void *arg)
@@ -171,6 +173,12 @@ void task(void *arg)
         case RECVFILE:
             RecvFile(mysocket,command);
             break;
+        case SENDFILEGROUP:
+            SendFileGroup(mysocket,command);
+            break;
+        case RECVFILEGROUP:
+            RecvFileGroup(mysocket,command);
+            break;
 
     }
 
@@ -187,7 +195,7 @@ int main()
 
     struct sockaddr_in saddr,caddr;
     saddr.sin_family=AF_INET;
-    saddr.sin_port=htons(9999);
+    saddr.sin_port=htons(PORT);
     saddr.sin_addr.s_addr=htonl(INADDR_ANY);
 
     //创建套接字
@@ -1204,11 +1212,15 @@ void GroupSendMsg(TcpSocket mysocket,UserCommand command)
                 redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
                 redis.rpushValue(memberid+"群聊消息",apply);
 
-            }else if(redis.sismember("在线用户列表",memberid)&&(redis.gethash(memberid,"聊天对象")==command.m_recvuid)&&memberid!=uid)
+            }else if(redis.sismember("在线用户列表",memberid)&&(redis.gethash(memberid,"聊天对象")==command.m_recvuid))
             {
-                string gr_recvfd=redis.gethash(memberid,"通知套接字");
-                TcpSocket gr_socket(stoi(gr_recvfd));
-                gr_socket.SendMsg(L_GREEN+msg1+NONE);
+                if(memberid!=uid)
+                {
+                    string gr_recvfd=redis.gethash(memberid,"通知套接字");
+                    TcpSocket gr_socket(stoi(gr_recvfd));
+                    gr_socket.SendMsg(L_GREEN+msg1+NONE);
+                }
+                
 
             }else if(redis.sismember("在线用户列表",memberid)&&memberid!=uid)
             {
@@ -1240,37 +1252,60 @@ void SendFile(TcpSocket mysocket,UserCommand command)
     string fullfilepath=savepath+filename;
 
     // 创建目录
-    int mkdirStatus = mkdir(savepath.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    int mkdirStatus = mkdir(savepath.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
     if (mkdirStatus != 0 && errno != EEXIST) {
         cerr << "Error creating directory: " << strerror(errno) << endl;
         //mysocket.SendMsg("close");
         //return;
     }
+    mysocket.SendMsg("ok");
 
-    int filefd = open(fullfilepath.c_str(), O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+    int filefd = open(fullfilepath.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRWXU);
     if (filefd == -1) {
         cerr << "Error opening file for writing" << endl;
         mysocket.SendMsg("close");
         return;
     }
 
+    //cout<<mysocket.getfd()<<endl;
+
     off_t offset=0;
     ssize_t totalRecvByte=0;
+    char buf[4096];
+
+    //lseek(filefd, 0, SEEK_SET);  // 将文件描述符位置重置到文件开头
+
 
     while(filesize>totalRecvByte)
     {
-        ssize_t byteRead=sendfile(filefd,mysocket.getfd(),&offset,filesize-totalRecvByte);
-        if(byteRead==-1)
-        {
-            cerr << "Error sending file content" << endl;
+        ssize_t byteRead=read(mysocket.getfd(),buf,sizeof(buf));//会返回-1
+        if (byteRead == -1) {
+            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+            {
+                continue;
+            }else{
+                cerr << "Error reading file: " << strerror(errno) << endl;
+            }
+            
+        }
+
+        if (byteRead == 0) {
+            cerr << "Connection closed by client" << endl;
             break;
         }
-        totalRecvByte+=byteRead;
+
+        ssize_t byteWritten=write(filefd,buf,byteRead);
+        if (byteWritten == -1) {
+            cerr << "Error writing to file" << endl;
+            break;
+        }
+
+        totalRecvByte+=byteWritten;
     }
 
     close(filefd);
 
-    mysocket.SendMsg("ok");
+    //mysocket.SendMsg("ok");
 
     //将新的消息加入消息队列
     string newmsg="我:发送了一个文件"+command.m_option[0];
@@ -1327,7 +1362,7 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
     string savepath = "/home/zhuheqin/clone/chatroom/file/";
     string fullfilepath = savepath + filename;
 
-    int filefd = open(fullfilepath.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRUSR | S_IWUSR);
+    int filefd = open(fullfilepath.c_str(), O_RDONLY);
     if (filefd == -1) {
         cerr << "Error opening file for writing" << endl;
         mysocket.SendMsg("close");
@@ -1342,11 +1377,205 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
             exit(0);
         }
 
-        sendfile(mysocket.getfd(),filefd,NULL,statbuf.st_size);
-        close(filefd);
+        ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
+        if (ret == -1) {
+            cerr << "Error sending file data: " << strerror(errno) << endl;
+            close(filefd);
+            return;
+        }
+        //mysocket.SendMsg("ok");
     }
 
     close(filefd);
 
+    //将新的消息加入消息队列
+    string newmsg="我:成功接收到一个文件"+command.m_option[0];
+    redis.rpushValue(command.m_uid+"和"+command.m_recvuid+"的聊天记录",newmsg);
+
+
+    //在发送者的页面展示消息
+    string my_recvfd=redis.gethash(command.m_uid,"通知套接字");
+    TcpSocket my_socket(stoi(my_recvfd));
+    my_socket.SendMsg(L_WHITE + newmsg + NONE);
+
+    //被好友屏蔽
+    if(redis.sismember(command.m_recvuid+"的屏蔽列表",command.m_uid))
+    {
+        string msg="您的消息已发出,但被对方拒收了";
+        my_socket.SendMsg(L_RED+msg+NONE);
+        mysocket.SendMsg("no");
+        return;
+        
+    }
+    string uid=command.m_uid;
+    string msg1=uid+":成功接收到一个文件"+command.m_option[0];
+    redis.rpushValue(command.m_recvuid+"和"+command.m_uid+"的聊天记录",msg1);
+    
+
+    //好友此时在线并且在和我聊天
+    if(redis.sismember("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
+    {
+        string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
+        TcpSocket fr_socket(stoi(fr_recvfd));
+        fr_socket.SendMsg(L_GREEN+msg1+NONE);
+
+    }else if(!redis.sismember("在线用户列表",command.m_recvuid))//好友不在线
+    {
+        string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
+        redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
+        redis.rpushValue(command.m_recvuid+"的通知消息",command.m_uid+"成功接收到您发送的文件");
+
+    }else{
+        string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
+        TcpSocket fr_socket(stoi(fr_recvfd));
+        fr_socket.SendMsg(L_RED+command.m_uid+"成功接收到您发送的文件"+NONE);
+    }
+
+
     mysocket.SendMsg("ok");
+    return;
+
+    
+}
+
+void SendFileGroup(TcpSocket mysocket,UserCommand command)
+{
+    string filename=command.m_option[0];//获得文件名
+    size_t filesize=stoul(command.m_option[1]);//转换字符串为无符号整型
+
+    string savepath="/home/zhuheqin/clone/chatroom/file"+command.m_recvuid+"/";//保存文件的路径
+    string fullfilepath=savepath+filename;
+
+    //cout<<"1"<<endl;
+
+    // 创建目录
+    int mkdirStatus = mkdir(savepath.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
+    if (mkdirStatus != 0 && errno != EEXIST) {
+        cerr << "Error creating directory: " << strerror(errno) << endl;
+        //mysocket.SendMsg("close");
+        //return;
+    }
+    //cout<<"2"<<endl;
+    mysocket.SendMsg("ok");
+
+    int filefd = open(fullfilepath.c_str(), O_WRONLY | O_CREAT | O_APPEND, S_IRWXU);
+    if (filefd == -1) {
+        cerr << "Error opening file for writing" << endl;
+        mysocket.SendMsg("close");
+        return;
+    }
+
+    //cout<<mysocket.getfd()<<endl;
+
+    off_t offset=0;
+    ssize_t totalRecvByte=0;
+    char buf[4096];
+
+    //lseek(filefd, 0, SEEK_SET);  // 将文件描述符位置重置到文件开头
+
+
+    while(filesize>totalRecvByte)
+    {
+        ssize_t byteRead=read(mysocket.getfd(),buf,sizeof(buf));//会返回-1
+        if (byteRead == -1) {
+            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+            {
+                continue;
+            }else{
+                cerr << "Error reading file: " << strerror(errno) << endl;
+            }
+            
+        }
+
+        if (byteRead == 0) {
+            cerr << "Connection closed by client" << endl;
+            break;
+        }
+
+        ssize_t byteWritten=write(filefd,buf,byteRead);
+        if (byteWritten == -1) {
+            cerr << "Error writing to file" << endl;
+            break;
+        }
+
+        totalRecvByte+=byteWritten;
+    }
+
+    close(filefd);
+
+    string newmsg=command.m_uid+":发送了一个文件"+command.m_option[0];
+    redis.rpushValue(command.m_recvuid+"的群聊消息",newmsg);
+
+    //在发送者的页面展示消息
+    string my_recvfd=redis.gethash(command.m_uid,"通知套接字");
+    TcpSocket my_socket(stoi(my_recvfd));
+    my_socket.SendMsg(L_WHITE + newmsg + NONE);
+
+    string uid=command.m_uid;
+    string msg1=uid+":发送了一个文件"+command.m_option[0];
+
+     vector<string> memberlist=redis.getFriendList(command.m_recvuid,"群成员列表");
+
+        for(const string& memberid:memberlist)
+        {
+            if(!redis.sismember("在线用户列表",memberid)&&memberid!=uid)
+            {
+                string apply=command.m_recvuid+"群聊中有人发来了一个新文件";
+                string num=redis.gethash(memberid+"的未读消息","群聊消息");
+                redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
+                redis.rpushValue(memberid+"群聊消息",apply);
+
+            }else if(redis.sismember("在线用户列表",memberid)&&(redis.gethash(memberid,"聊天对象")==command.m_recvuid)&&memberid!=uid)
+            {
+                string gr_recvfd=redis.gethash(memberid,"通知套接字");
+                TcpSocket gr_socket(stoi(gr_recvfd));
+                gr_socket.SendMsg(L_GREEN+msg1+NONE);
+
+            }else if(redis.sismember("在线用户列表",memberid)&&memberid!=uid)
+            {
+                string apply=command.m_recvuid+"群聊中有人发来了一个新文件";
+                string gr_recvfd=redis.gethash(memberid,"通知套接字");
+                TcpSocket gr_socket(stoi(gr_recvfd));
+                gr_socket.SendMsg(L_GREEN+apply+NONE);
+            }
+        }
+
+        mysocket.SendMsg("ok");
+        return;
+}
+
+void RecvFileGroup(TcpSocket mysocket,UserCommand command)
+{
+    string filename = command.m_option[0];
+
+    string savepath = "/home/zhuheqin/clone/chatroom/file"+command.m_recvuid+"/";
+    string fullfilepath = savepath + filename;
+
+    int filefd = open(fullfilepath.c_str(), O_RDONLY);
+    if (filefd == -1) {
+        cerr << "Error opening file for writing" << endl;
+        mysocket.SendMsg("close");
+        return;
+    }else{
+        struct stat statbuf;
+        fstat(filefd,&statbuf);
+        int ret=mysocket.SendMsg(to_string(statbuf.st_size));
+        if(ret==0||ret==-1)
+        {
+            cout<<"已关闭"<<endl;
+            exit(0);
+        }
+
+        ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
+        if (ret == -1) {
+            cerr << "Error sending file data: " << strerror(errno) << endl;
+            close(filefd);
+            return;
+        }
+        
+    }
+
+    close(filefd);
+    
+    //mysocket.SendMsg("ok");
 }

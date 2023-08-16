@@ -138,7 +138,7 @@ ssize_t Readn(int fd,void *vptr,size_t n)
     {
         if((nread=read(fd,ptr,nleft))<0)
         {
-            if(errno==EINTR)
+            if(errno==EINTR||EWOULDBLOCK)
             {
                 nread=0;
             }else{
@@ -202,7 +202,7 @@ ssize_t Writen(int fd,const void *vptr,size_t n)
     {
         if((nwritten=write(fd,ptr,nleft))<=0)
         {
-            if(nwritten<0&&errno==EINTR)
+            if(nwritten<0&&(errno==EINTR||EWOULDBLOCK))
             {
                 nwritten=0;
             }else{

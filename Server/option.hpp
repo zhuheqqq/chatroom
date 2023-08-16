@@ -4,7 +4,7 @@
 #define SIGNUP 1
 #define LOGIN 2
 #define LOGOUT 3
-#define FRIENDLIST 0//隐藏bug除了0都不行
+#define FRIENDLIST 4
 #define ADDFRIEND 5
 #define DELETEFRIEND 6
 #define AGREEADDFRIEND 7
@@ -35,6 +35,8 @@
 #define CHANGEPASSWORD 32
 #define SENDFILE 33
 #define RECVFILE 34
+#define SENDFILEGROUP 35
+#define RECVFILEGROUP 36
 
 
 // ANSI 转义码设置文本颜色
@@ -48,3 +50,6 @@
 #define L_YELLOW "\033[1;33m" //黄色
 #define L_RED "\033[1;31m"  //红色
 #define L_BLUE "\033[1;34m"//蓝色
+
+#define IP "127.0.0.1"
+#define PORT 9999
