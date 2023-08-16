@@ -7,7 +7,7 @@ using namespace std;
 
 class Redis {
 public:
-    Redis(const string& host = "127.0.0.1", int port = 6379) {
+    Redis(const string& host = IP, int port = 6379) {
         context = redisConnect(host.c_str(), port);// 使用提供的主机和端口连接到Redis服务器。
         if (context == nullptr || context->err) {
             if (context) {// 如果连接已建立但出现错误，则输出错误消息
