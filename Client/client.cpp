@@ -980,6 +980,10 @@ void CreateGroup()
         {
             cout<<"服务器端已关闭"<<endl;
             exit(0);
+        }else if(recv=="no")
+        {
+            cout<<"您不能邀请自己进群"<<endl;
+            return;
         }else if(recv=="nofind")
         {
             cout<<"您暂时还没有该好友"<<endl;
@@ -1305,6 +1309,10 @@ void DeleteMember(string groupuid)
     }else if(recv=="none")
     {
         cout<<"您不在此群聊中"<<endl;
+        return;
+    }else if(recv=="nono")
+    {
+        cout<<"您不能移除自己"<<endl;
         return;
     }else if(recv=="no")
     {
