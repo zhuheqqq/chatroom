@@ -42,14 +42,20 @@ void DeleteManager(string groupuid);//取消管理员身份
 void DissolveGroup(string groupuid);//解散群聊
 void ChatGroup(string groupuid);
 
+string IP;
+
 int main(int argc,char **argv)
 {
     //UserCommand Curcommand;
 
     setup();
 
-    char *buf;
-    unsigned long port=strtoul(argv[2],&buf,20);
+    IP=argv[1];
+
+   
+    int port=stoi(argv[2]);
+
+    //cout<< argv[1]<<static_cast<unsigned short>(port)<<endl;
 
     mysocket.ConnectToHost(argv[1],static_cast<unsigned short>(port));
     //mysocket.ConnectToHost("0.0.0.0",9999);
@@ -106,6 +112,7 @@ int main(int argc,char **argv)
         }
     }
 }
+
 
 int FriendManage()
 {
@@ -733,8 +740,32 @@ int ChatWithFriend()
                         //cout<<"已成功发送上传文件的请求"<<endl;
                         int ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
                         if (ret == -1) {
-                            cerr << "Error sending file data: " << strerror(errno) << endl;
-                        }
+                            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+                            {
+                                ssize_t bytes_sent = 0;
+                                while (bytes_sent < statbuf.st_size) {
+                                    ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+                                    if (ret_send == -1) {
+                                        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                                            // 继续尝试发送
+                                            continue;
+                                        } else {
+                                            cerr << "Error sending file data: " << strerror(errno) << endl;
+                                            break;
+                                        }
+                                    } else if (ret_send == 0) {
+                                        cerr << "Connection closed by peer while sending file data." << endl;
+                                        break;
+                                    }
+                                    bytes_sent += ret_send;
+                                }
+                            }
+            
+                        }else{
+                                cerr << "Error sending file data: " << strerror(errno) << endl;
+                                close(filefd);
+                                return 0;
+                            }
                     }
 
                     close(filefd);
@@ -1532,8 +1563,32 @@ void ChatGroup(string groupuid)
                         //cout<<"已成功发送上传文件的请求"<<endl;
                         int ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
                         if (ret == -1) {
-                            cerr << "Error sending file data: " << strerror(errno) << endl;
-                        }
+                            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+                            {
+                                ssize_t bytes_sent = 0;
+                                while (bytes_sent < statbuf.st_size) {
+                                    ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+                                    if (ret_send == -1) {
+                                        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                                            // 继续尝试发送
+                                            continue;
+                                        } else {
+                                            cerr << "Error sending file data: " << strerror(errno) << endl;
+                                            break;
+                                        }
+                                    } else if (ret_send == 0) {
+                                        cerr << "Connection closed by peer while sending file data." << endl;
+                                        break;
+                                    }
+                                    bytes_sent += ret_send;
+                                }
+                            }
+                            }else{
+                                cerr << "Error sending file data: " << strerror(errno) << endl;
+                                close(filefd);
+                                return;
+                            }
+
                     }
 
                     close(filefd);

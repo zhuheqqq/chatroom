@@ -12,6 +12,8 @@
 #include "Menu.hpp"
 //#include "client.cpp"
 
+extern string IP;
+
 using namespace std;
 extern UserCommand Curcommand;
 TcpSocket mysocket("recv");
