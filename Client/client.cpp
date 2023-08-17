@@ -751,6 +751,7 @@ int ChatWithFriend()
                                             continue;
                                         } else {
                                             cerr << "Error sending file data: " << strerror(errno) << endl;
+                                            close(filefd);
                                             break;
                                         }
                                     } else if (ret_send == 0) {
@@ -761,11 +762,7 @@ int ChatWithFriend()
                                 }
                             }
             
-                        }else{
-                                cerr << "Error sending file data: " << strerror(errno) << endl;
-                                close(filefd);
-                                return 0;
-                            }
+                        }
                     }
 
                     close(filefd);
@@ -1574,6 +1571,7 @@ void ChatGroup(string groupuid)
                                             continue;
                                         } else {
                                             cerr << "Error sending file data: " << strerror(errno) << endl;
+                                            close(filefd);
                                             break;
                                         }
                                     } else if (ret_send == 0) {
@@ -1583,11 +1581,7 @@ void ChatGroup(string groupuid)
                                     bytes_sent += ret_send;
                                 }
                             }
-                            }else{
-                                cerr << "Error sending file data: " << strerror(errno) << endl;
-                                close(filefd);
-                                return;
-                            }
+                        }
 
                     }
 
