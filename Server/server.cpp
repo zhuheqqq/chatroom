@@ -1379,9 +1379,29 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
 
         ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
         if (ret == -1) {
-            cerr << "Error sending file data: " << strerror(errno) << endl;
-            close(filefd);
-            return;
+            if (ret == -1) {
+                if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+                {
+                    ssize_t bytes_sent = 0;
+                    while (bytes_sent < statbuf.st_size) {
+                        ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+                        if (ret_send == -1) {
+                            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                                // 继续尝试发送
+                                continue;
+                            } else {
+                                cerr << "Error sending file data: " << strerror(errno) << endl;
+                                close(filefd);
+                                break;
+                            }
+                        } else if (ret_send == 0) {
+                            cerr << "Connection closed by peer while sending file data." << endl;
+                            break;
+                        }
+                        bytes_sent += ret_send;
+                    }
+                }
+            }
         }
         //mysocket.SendMsg("ok");
     }
@@ -1579,6 +1599,7 @@ void RecvFileGroup(TcpSocket mysocket,UserCommand command)
                             continue;
                         } else {
                             cerr << "Error sending file data: " << strerror(errno) << endl;
+                            close(filefd);
                             break;
                         }
                     } else if (ret_send == 0) {
@@ -1587,12 +1608,7 @@ void RecvFileGroup(TcpSocket mysocket,UserCommand command)
                     }
                     bytes_sent += ret_send;
                 }
-            }else{
-                cerr << "Error sending file data: " << strerror(errno) << endl;
-                close(filefd);
-                return;
             }
-            
         }
         
     }
