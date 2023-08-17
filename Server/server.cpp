@@ -196,7 +196,7 @@ int main()
     struct sockaddr_in saddr,caddr;
     saddr.sin_family=AF_INET;
     saddr.sin_port=htons(PORT);
-    saddr.sin_addr.s_addr=0;
+    saddr.sin_addr.s_addr=htonl(INADDR_ANY);
 
     //创建套接字
     lfd=Socket(AF_INET,SOCK_STREAM,0);
@@ -1568,9 +1568,31 @@ void RecvFileGroup(TcpSocket mysocket,UserCommand command)
 
         ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
         if (ret == -1) {
-            cerr << "Error sending file data: " << strerror(errno) << endl;
-            close(filefd);
-            return;
+            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+            {
+                ssize_t bytes_sent = 0;
+                while (bytes_sent < statbuf.st_size) {
+                    ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+                    if (ret_send == -1) {
+                        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                            // 继续尝试发送
+                            continue;
+                        } else {
+                            cerr << "Error sending file data: " << strerror(errno) << endl;
+                            break;
+                        }
+                    } else if (ret_send == 0) {
+                        cerr << "Connection closed by peer while sending file data." << endl;
+                        break;
+                    }
+                    bytes_sent += ret_send;
+                }
+            }else{
+                cerr << "Error sending file data: " << strerror(errno) << endl;
+                close(filefd);
+                return;
+            }
+            
         }
         
     }

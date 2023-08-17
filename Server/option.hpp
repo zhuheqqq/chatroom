@@ -51,5 +51,5 @@
 #define L_RED "\033[1;31m"  //红色
 #define L_BLUE "\033[1;34m"//蓝色
 
-#define IP "127.0.0.1"
-#define PORT 9999
+//#define IP "127.0.0.1"
+#define PORT 9000
