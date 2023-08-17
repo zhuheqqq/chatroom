@@ -1,5 +1,7 @@
 #include "../Classes/TcpSocket.cpp"
 #include "../Classes/UserCommand.hpp"
+//#include "../Classes/TaskHandler.hpp"
+#include "../Classes/ThreadPool.hpp"
 #include "option.hpp"
 #include "wrap.hpp"
 #include "../Classes/Redis.hpp"
@@ -13,9 +15,12 @@
 #include <sys/sendfile.h>
 #include <sys/stat.h>
 
+unordered_set<string> onlineUsers; // 在线用户集合
+
 using namespace std;
 Redis redis;
 extern UserCommand Curcommand;
+
 struct Argc_func {
 public:
     Argc_func(TcpSocket mysocket, string command_string)
@@ -63,7 +68,7 @@ void SendFileGroup(TcpSocket mysocket,UserCommand command);//群聊中发送文�
 void RecvFileGroup(TcpSocket mysocket,UserCommand command);//群聊中接收文件
 
 
-void task(void *arg)
+void taskhandler(void *arg)
 {
     Argc_func *argc_func = static_cast<Argc_func*>(arg);
     UserCommand command;     // Command类存客户端的命令内容
@@ -185,8 +190,6 @@ void task(void *arg)
     return;
 }
 
-
-
 int main()
 {
 
@@ -225,6 +228,9 @@ int main()
     {
         perr_exit("epoll_ctl");
     }
+
+    // 创建线程池，指定最小线程数和最大线程数
+    ThreadPool pool(5, 10); // 假设最小线程数为 5，最大线程数为 10
        
     while(1)
     {
@@ -270,7 +276,8 @@ int main()
                 {
                     cerr<<"error receiving data ."<<endl;
                     string uid =redis.gethash("fd-uid表",to_string(curfd)); // 获取客户端的用户ID
-                    redis.sremValue("在线用户列表",uid);
+                    // 添加到在线用户集合
+                    onlineUsers.insert(uid);
                     redis.hsetValue(uid,"通知套接字","-1");
                     redis.hsetValue("fd-uid表",to_string(curfd),"-1");
                     close(curfd);
@@ -292,8 +299,10 @@ int main()
                     redis.hsetValue(command.m_uid, "通知套接字", to_string(curfd));
                     //redis.hsetValue("fd-uid表", to_string(curfd), command.m_uid+"(通)");
                 }else{
-                    Argc_func argc_func(TcpSocket(curfd),command_string);
-                    task(&argc_func);
+                    // 创建任务并添加到线程池
+                    Argc_func* argc_func = new Argc_func(TcpSocket(curfd), command_string);
+                    Task task(taskhandler, argc_func);
+                    pool.addTask(task);
                 }
                 
             }
@@ -347,6 +356,11 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
     if(!redis.sismember("用户uid集合",command.m_uid)){//帐号不存在返回错误
         mysocket.SendMsg("nonexisent");
     }else{
+        if(onlineUsers.find(command.m_recvuid) != onlineUsers.end())
+        {
+            mysocket.SendMsg("handled");//此帐号已经被登录
+            return ;
+        }
         //如果帐号存在进行密码比对
         string pwd=redis.gethash(command.m_uid,"密码");
         if(pwd!=command.m_option[0])
@@ -354,7 +368,7 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
             mysocket.SendMsg("discorrect");
 
         }else{ 
-            redis.saddvalue("在线用户列表",command.m_uid);
+            onlineUsers.insert(command.m_uid);
             //密码正确，可以登陆改变其在线状态
             //redis.hsetValue(command.m_uid,"在线状态",to_string(mysocket.getfd()));
             redis.hsetValue("fd-uid表",to_string(mysocket.getfd()),command.m_uid);
@@ -428,7 +442,7 @@ void FriendList(TcpSocket mysocket,UserCommand command)
 
     for (const string& friendID : friendList) {
         if (!redis.sismember(command.m_uid + "的屏蔽列表", friendID)) {
-            if (redis.sismember("在线用户列表",friendID)) {
+            if (onlineUsers.find(friendID) != onlineUsers.end()) {
                 mysocket.SendMsg(L_GREEN+friendID+NONE);
             } else {
                 mysocket.SendMsg(friendID);
@@ -481,7 +495,7 @@ void Add_Friend(TcpSocket mysocket,UserCommand command)
     redis.hsetValue(command.m_recvuid+"的未读消息","好友申请",to_string(stoi(nums)+1));
 
     //给好友发送实时通知
-    if(redis.sismember("在线用户列表",command.m_recvuid))
+    if(onlineUsers.find(command.m_recvuid) != onlineUsers.end())
     {
         //cout<<"1"<<endl;
         string friend_fd=redis.gethash(command.m_recvuid,"通知套接字");
@@ -540,7 +554,7 @@ void AgreeAddFriend(TcpSocket mysocket,UserCommand command)//同意好友申请
         redis.hsetValue(command.m_option[0] + "的未读消息", "通知消息", to_string(stoi(num1)+1));
 
         //给好友发送实时通知
-        if(redis.sismember("在线用户列表",command.m_option[0]))
+        if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
         {
             string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
             TcpSocket friendsocket(stoi(friend_fd));
@@ -579,7 +593,7 @@ void RefuseAddFriend(TcpSocket mysocket,UserCommand command)//拒绝好友申请
         redis.rpushValue(command.m_option[0]+"的通知消息",command.m_uid+"拒绝了您的好友申请");
 
         //给好友发送实时通知
-        if(redis.sismember("在线用户列表",command.m_option[0]))
+        if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
         {
             string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
             TcpSocket friendsocket(stoi(friend_fd));
@@ -654,12 +668,12 @@ void ViewOnlineStatus(TcpSocket mysocket,UserCommand command)
     {
         mysocket.SendMsg("none");
         return;
-    }else if(!redis.sismember("在线用户列表",command.m_option[0]))
+    }else if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
     {
-        mysocket.SendMsg("no");
+        mysocket.SendMsg("ok");
         return;
     }else{
-        mysocket.SendMsg("ok");
+        mysocket.SendMsg("no");
         return;
     }
 }
@@ -755,13 +769,13 @@ void FriendSendMsg(TcpSocket mysocket,UserCommand command)//发送消息
     
 
     //好友此时在线并且在和我聊天
-    if(redis.sismember("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
+    if((onlineUsers.find(command.m_recvuid) != onlineUsers.end())&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
     {
         string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket fr_socket(stoi(fr_recvfd));
         fr_socket.SendMsg(L_GREEN+msg1+NONE);
 
-    }else if(!redis.sismember("在线用户列表",command.m_recvuid))//好友不在线
+    }else if(onlineUsers.find(command.m_recvuid) == onlineUsers.end())//好友不在线
     {
         string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
         redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
@@ -828,7 +842,7 @@ void CreateGroup(TcpSocket mysocket,UserCommand command)//创建群聊
             redis.hsetValue(groupuid+"群成员列表",command.m_option[0],"群成员");
             redis.hsetValue(command.m_option[0]+"的群聊列表",groupuid,"群成员");
 
-            if(redis.sismember("在线用户列表",command.m_option[0]))
+            if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
             {
                 string friend_fd=redis.gethash(command.m_option[0],"通知套接字");
                 TcpSocket friendsocket(stoi(friend_fd));
@@ -964,7 +978,7 @@ void DeleteMember(TcpSocket mysocket,UserCommand command)
             redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
             redis.rpushValue(memberid+"群聊消息",apply);
 
-            if(redis.sismember("在线用户列表",memberid))
+            if(onlineUsers.find(memberid) != onlineUsers.end())
             {
                 string member_fd=redis.gethash(memberid,"通知套接字");
                 TcpSocket membersocket(stoi(member_fd));
@@ -994,7 +1008,7 @@ void AddManager(TcpSocket mysocket,UserCommand command)//功能暂时好着呢
 
     redis.hsetValue(command.m_recvuid+"群成员列表",command.m_option[0],"群管理员");
 
-    if(redis.sismember("在线用户列表",command.m_option[0]))
+    if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
     {
         string member_fd=redis.gethash(command.m_option[0],"通知套接字");
         TcpSocket membersocket(stoi(member_fd));
@@ -1020,7 +1034,7 @@ void DeleteManager(TcpSocket mysocket,UserCommand command)
 
     redis.hsetValue(command.m_recvuid+"群成员列表",command.m_option[0],"群成员");
 
-    if(redis.sismember("在线用户列表",command.m_option[0]))
+    if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
     {
         string member_fd=redis.gethash(command.m_option[0],"通知套接字");
         TcpSocket membersocket(stoi(member_fd));
@@ -1052,7 +1066,7 @@ void DissolveGroup(TcpSocket mysocket,UserCommand command)
         redis.rpushValue(memberid+"群聊消息",apply);
 
         //实时通知没有实现
-        if(redis.sismember("在线用户列表",memberid)&&redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群主")
+        if((onlineUsers.find(memberid) != onlineUsers.end())&&redis.gethash(command.m_option[0]+"群成员列表",memberid)!="群主")
         {
             string member_fd=redis.gethash(memberid,"通知套接字");
             TcpSocket membersocket(stoi(member_fd));
@@ -1110,7 +1124,7 @@ void AgreeAddMember(TcpSocket mysocket,UserCommand command)
                 redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
                 redis.rpushValue(memberid+"群聊消息",apply);
 
-                if(redis.sismember("在线用户列表",memberid))
+                if(onlineUsers.find(memberid) != onlineUsers.end())
                 {
                     string member_fd=redis.gethash(memberid,"通知套接字");
                     TcpSocket membersocket(stoi(member_fd));
@@ -1120,7 +1134,7 @@ void AgreeAddMember(TcpSocket mysocket,UserCommand command)
         }
     }
     mysocket.SendMsg("ok");
-    if(redis.sismember("在线用户列表",command.m_option[0]))
+    if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
     {
         string member_fd=redis.gethash(command.m_option[0],"通知套接字");
         TcpSocket membersocket(stoi(member_fd));
@@ -1147,7 +1161,7 @@ void RefuseAddMember(TcpSocket mysocket,UserCommand command)
                 redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
                 redis.rpushValue(memberid+"群聊消息",apply);
 
-                if(redis.sismember("在线用户列表",memberid))
+                if(onlineUsers.find(memberid) != onlineUsers.end())
                 {
                     string member_fd=redis.gethash(memberid,"通知套接字");
                     TcpSocket membersocket(stoi(member_fd));
@@ -1156,7 +1170,7 @@ void RefuseAddMember(TcpSocket mysocket,UserCommand command)
             }
         }
         mysocket.SendMsg("ok");
-        if(redis.sismember("在线用户列表",command.m_option[0]))
+        if(onlineUsers.find(command.m_option[0]) != onlineUsers.end())
         {
             string member_fd=redis.gethash(command.m_option[0],"通知套接字");
             TcpSocket membersocket(stoi(member_fd));
@@ -1205,14 +1219,14 @@ void GroupSendMsg(TcpSocket mysocket,UserCommand command)
 
         for(const string& memberid:memberlist)
         {
-            if(!redis.sismember("在线用户列表",memberid)&&memberid!=uid)
+            if((onlineUsers.find(memberid) == onlineUsers.end())&&memberid!=uid)
             {
                 string apply=command.m_recvuid+"群聊中有人发来了一条新消息";
                 string num=redis.gethash(memberid+"的未读消息","群聊消息");
                 redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
                 redis.rpushValue(memberid+"群聊消息",apply);
 
-            }else if(redis.sismember("在线用户列表",memberid)&&(redis.gethash(memberid,"聊天对象")==command.m_recvuid))
+            }else if((onlineUsers.find(memberid) != onlineUsers.end())&&(redis.gethash(memberid,"聊天对象")==command.m_recvuid))
             {
                 if(memberid!=uid)
                 {
@@ -1222,7 +1236,7 @@ void GroupSendMsg(TcpSocket mysocket,UserCommand command)
                 }
                 
 
-            }else if(redis.sismember("在线用户列表",memberid)&&memberid!=uid)
+            }else if((onlineUsers.find(memberid) != onlineUsers.end())&&memberid!=uid)
             {
                 string apply=command.m_recvuid+"群聊中有人发来了一条新消息";
                 string gr_recvfd=redis.gethash(memberid,"通知套接字");
@@ -1271,17 +1285,22 @@ void SendFile(TcpSocket mysocket,UserCommand command)
 
     off_t offset=0;
     ssize_t totalRecvByte=0;
-    char buf[4096];
+    char buf[BUFSIZ];
 
     //lseek(filefd, 0, SEEK_SET);  // 将文件描述符位置重置到文件开头
 
 
     while(filesize>totalRecvByte)
     {
-        ssize_t byteRead=read(mysocket.getfd(),buf,sizeof(buf));//会返回-1
+        //cout<<"1"<<endl;
+        //memset(buf,0,sizeof(buf));
+        bzero(buf,BUFSIZ);
+        ssize_t byteRead=read(mysocket.getfd(),buf,BUFSIZ);//会返回-1
+        cout<<byteRead<<endl;
         if (byteRead == -1) {
-            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+            if(errno==EAGAIN||errno==EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
             {
+                //cout<<"1"<<endl;
                 continue;
             }else{
                 cerr << "Error reading file: " << strerror(errno) << endl;
@@ -1300,7 +1319,12 @@ void SendFile(TcpSocket mysocket,UserCommand command)
             break;
         }
 
+        
         totalRecvByte+=byteWritten;
+        cout<<totalRecvByte<<endl;
+        //重设偏移
+        lseek(filefd,totalRecvByte,SEEK_SET);
+        
     }
 
     close(filefd);
@@ -1332,13 +1356,13 @@ void SendFile(TcpSocket mysocket,UserCommand command)
     
 
     //好友此时在线并且在和我聊天
-    if(redis.sismember("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
+    if(onlineUsers.find(command.m_recvuid) != onlineUsers.end()&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
     {
         string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket fr_socket(stoi(fr_recvfd));
         fr_socket.SendMsg(L_GREEN+msg1+NONE);
 
-    }else if(!redis.sismember("在线用户列表",command.m_recvuid))//好友不在线
+    }else if(onlineUsers.find(command.m_recvuid) == onlineUsers.end())//好友不在线
     {
         string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
         redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
@@ -1433,13 +1457,13 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
     
 
     //好友此时在线并且在和我聊天
-    if(redis.sismember("在线用户列表",command.m_recvuid)&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
+    if((onlineUsers.find(command.m_recvuid) != onlineUsers.end())&&(redis.gethash(command.m_recvuid,"聊天对象")==command.m_uid))
     {
         string fr_recvfd=redis.gethash(command.m_recvuid,"通知套接字");
         TcpSocket fr_socket(stoi(fr_recvfd));
         fr_socket.SendMsg(L_GREEN+msg1+NONE);
 
-    }else if(!redis.sismember("在线用户列表",command.m_recvuid))//好友不在线
+    }else if(onlineUsers.find(command.m_recvuid) == onlineUsers.end())//好友不在线
     {
         string num = redis.gethash(command.m_recvuid + "的未读消息", "通知消息");
         redis.hsetValue(command.m_recvuid + "的未读消息", "通知消息", to_string(stoi(num)+1));
@@ -1538,20 +1562,20 @@ void SendFileGroup(TcpSocket mysocket,UserCommand command)
 
         for(const string& memberid:memberlist)
         {
-            if(!redis.sismember("在线用户列表",memberid)&&memberid!=uid)
+            if((onlineUsers.find(memberid) == onlineUsers.end())&&memberid!=uid)
             {
                 string apply=command.m_recvuid+"群聊中有人发来了一个新文件";
                 string num=redis.gethash(memberid+"的未读消息","群聊消息");
                 redis.hsetValue(memberid+"的未读消息","群聊消息",to_string(stoi(num)+1));
                 redis.rpushValue(memberid+"群聊消息",apply);
 
-            }else if(redis.sismember("在线用户列表",memberid)&&(redis.gethash(memberid,"聊天对象")==command.m_recvuid)&&memberid!=uid)
+            }else if((onlineUsers.find(command.m_recvuid) != onlineUsers.end())&&(redis.gethash(memberid,"聊天对象")==command.m_recvuid)&&memberid!=uid)
             {
                 string gr_recvfd=redis.gethash(memberid,"通知套接字");
                 TcpSocket gr_socket(stoi(gr_recvfd));
                 gr_socket.SendMsg(L_GREEN+msg1+NONE);
 
-            }else if(redis.sismember("在线用户列表",memberid)&&memberid!=uid)
+            }else if((onlineUsers.find(command.m_recvuid) != onlineUsers.end())&&memberid!=uid)
             {
                 string apply=command.m_recvuid+"群聊中有人发来了一个新文件";
                 string gr_recvfd=redis.gethash(memberid,"通知套接字");
