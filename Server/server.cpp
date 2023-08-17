@@ -288,7 +288,7 @@ int main()
                 //cout<<buf<<endl;
                 string command_string=buf;
 
-                UserCommand command;
+                UserCommand command,command1;
                 command.From_Json(command_string);
                 cout<<"Recrived request:"<<command_string<<endl;
                 //创建任务，处理客户端请求
@@ -298,6 +298,12 @@ int main()
                 {
                     redis.hsetValue(command.m_uid, "通知套接字", to_string(curfd));
                     //redis.hsetValue("fd-uid表", to_string(curfd), command.m_uid+"(通)");
+                }else if(command.m_flag==SENDFILE||RECVFILE||SENDFILEGROUP||RECVFILEGROUP)
+                {
+                    Argc_func argc_func(TcpSocket(curfd),command_string);
+                    taskhandler
+                    (&argc_func);
+                    
                 }else{
                     // 创建任务并添加到线程池
                     Argc_func* argc_func = new Argc_func(TcpSocket(curfd), command_string);
@@ -723,7 +729,7 @@ void ChatWithFriend(TcpSocket mysocket,UserCommand command)
     if(!redis.hexists(command.m_uid+"的好友列表",command.m_recvuid))
     {
         mysocket.SendMsg("nofind");
-        exit(0);
+        return;
     }
     mysocket.SendMsg("ok");
     //如果存在该好友就打印历史聊天记录
@@ -809,6 +815,10 @@ void CreateGroup(TcpSocket mysocket,UserCommand command)//创建群聊
     {
         mysocket.SendMsg("nofind");
         return;
+    }else if(command.m_uid==command.m_option[0])
+    {
+        mysocket.SendMsg("no");
+        return;
     }
 
     //有的话进行下一步，随机到未被注册到的群聊uid
@@ -885,6 +895,7 @@ void AddGroup(TcpSocket mysocket,UserCommand command)//功能好着呢
         return;
     }else if(redis.hexists(command.m_option[0]+"的申请加群列表",command.m_uid)){
         mysocket.SendMsg("had");
+        return;
     }else
     {
         //在申请加群列表里添加信息
@@ -961,6 +972,10 @@ void DeleteMember(TcpSocket mysocket,UserCommand command)
     }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)=="群成员")
     {
         mysocket.SendMsg("no");
+        return;
+    }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群成员"&&command.m_uid==command.m_option[0])
+    {
+        mysocket.SendMsg("nono");
         return;
     }
 
@@ -1289,14 +1304,16 @@ void SendFile(TcpSocket mysocket,UserCommand command)
 
     //lseek(filefd, 0, SEEK_SET);  // 将文件描述符位置重置到文件开头
 
-
+    //重设偏移
+    lseek(filefd,0,SEEK_SET);
+    
     while(filesize>totalRecvByte)
     {
         //cout<<"1"<<endl;
         //memset(buf,0,sizeof(buf));
-        bzero(buf,BUFSIZ);
+        //bzero(buf,BUFSIZ);
         ssize_t byteRead=read(mysocket.getfd(),buf,BUFSIZ);//会返回-1
-        cout<<byteRead<<endl;
+        //cout<<byteRead<<endl;
         if (byteRead == -1) {
             if(errno==EAGAIN||errno==EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
             {
@@ -1322,8 +1339,7 @@ void SendFile(TcpSocket mysocket,UserCommand command)
         
         totalRecvByte+=byteWritten;
         cout<<totalRecvByte<<endl;
-        //重设偏移
-        lseek(filefd,totalRecvByte,SEEK_SET);
+        
         
     }
 
@@ -1401,31 +1417,23 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
             exit(0);
         }
 
-        ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
-        if (ret == -1) {
-            if (ret == -1) {
-                if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
-                {
-                    ssize_t bytes_sent = 0;
-                    while (bytes_sent < statbuf.st_size) {
-                        ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
-                        if (ret_send == -1) {
-                            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
-                                // 继续尝试发送
-                                continue;
-                            } else {
-                                cerr << "Error sending file data: " << strerror(errno) << endl;
-                                close(filefd);
-                                break;
-                            }
-                        } else if (ret_send == 0) {
-                            cerr << "Connection closed by peer while sending file data." << endl;
-                            break;
-                        }
-                        bytes_sent += ret_send;
-                    }
+        ssize_t bytes_sent = 0;
+        while (bytes_sent < statbuf.st_size) {
+            ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+            if (ret_send == -1) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // 继续尝试发送
+                    continue;
+                } else {
+                    cerr << "Error sending file data: " << strerror(errno) << endl;
+                    close(filefd);
+                    break;
                 }
+            } else if (ret_send == 0) {
+                cerr << "Connection closed by peer while sending file data." << endl;
+                break;
             }
+            bytes_sent += ret_send;
         }
         //mysocket.SendMsg("ok");
     }
