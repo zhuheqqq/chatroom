@@ -602,11 +602,11 @@ int View_OnlineStatus()//已实现
         return 0;
     }else if(recv=="ok")
     {
-        cout<<"用户"<<viewuid<<"现在在线,快去找ta聊天吧"<<endl;
+        cout<<L_RED<<"用户"<<viewuid<<"现在在线,快去找ta聊天吧"<<NONE<<endl;
         return 1;
     }else if(recv=="no")
     {
-        cout<<"用户"<<viewuid<<"现在不在线,有事请留言"<<endl;
+        cout<<L_PRED<<"用户"<<viewuid<<"现在不在线,有事请留言"<<NONE<<endl;
         return 1;
     }else{
         cout<<"其他错误"<<endl;
@@ -737,31 +737,25 @@ int ChatWithFriend()
                         exit(0);
                     }else if(recv_file=="ok")
                     {
-                        //cout<<"已成功发送上传文件的请求"<<endl;
-                        int ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
-                        if (ret == -1) {
-                            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
-                            {
-                                ssize_t bytes_sent = 0;
-                                while (bytes_sent < statbuf.st_size) {
-                                    ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
-                                    if (ret_send == -1) {
-                                        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
-                                            // 继续尝试发送
-                                            continue;
-                                        } else {
-                                            cerr << "Error sending file data: " << strerror(errno) << endl;
-                                            close(filefd);
-                                            break;
-                                        }
-                                    } else if (ret_send == 0) {
-                                        cerr << "Connection closed by peer while sending file data." << endl;
-                                        break;
-                                    }
-                                    bytes_sent += ret_send;
+                        ssize_t bytes_sent = 0;
+                        cout<<statbuf.st_size<<endl;
+                        while (bytes_sent < statbuf.st_size) {
+                            ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+                            cout<<ret_send<<endl;
+                            if (ret_send == -1) {
+                                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                                    // 继续尝试发送
+                                    continue;
+                                } else {
+                                    cerr << "Error sending file data: " << strerror(errno) << endl;
+                                    close(filefd);
+                                    break;
                                 }
+                            } else if (ret_send == 0) {
+                                cerr << "Connection closed by peer while sending file data." << endl;
+                                break;
                             }
-            
+                            bytes_sent += ret_send;
                         }
                     }
 
@@ -824,7 +818,7 @@ int ChatWithFriend()
                     {
                         ssize_t byteRead=read(mysocket.getfd(),buf,sizeof(buf));//会返回-1
                         if (byteRead == -1) {
-                            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+                            if(errno == EINTR || errno == EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
                             {
                                 continue;
                             }else{
@@ -845,6 +839,10 @@ int ChatWithFriend()
                         }
 
                         totalRecvByte+=byteWritten;
+                    }
+
+                    if (totalRecvByte < size) {
+                        cerr << "File transmission incomplete" << endl;
                     }
 
                     close(filefd);
@@ -1558,33 +1556,25 @@ void ChatGroup(string groupuid)
                     }else if(recv_file=="ok")
                     {
                         //cout<<"已成功发送上传文件的请求"<<endl;
-                        int ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
-                        if (ret == -1) {
-                            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
-                            {
-                                ssize_t bytes_sent = 0;
-                                while (bytes_sent < statbuf.st_size) {
-                                    ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
-                                    if (ret_send == -1) {
-                                        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
-                                            // 继续尝试发送
-                                            continue;
-                                        } else {
-                                            cerr << "Error sending file data: " << strerror(errno) << endl;
-                                            close(filefd);
-                                            break;
-                                        }
-                                    } else if (ret_send == 0) {
-                                        cerr << "Connection closed by peer while sending file data." << endl;
-                                        break;
-                                    }
-                                    bytes_sent += ret_send;
+                        ssize_t bytes_sent = 0;
+                        while (bytes_sent < statbuf.st_size) {
+                            ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+                            if (ret_send == -1) {
+                                if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                                    // 继续尝试发送
+                                    continue;
+                                }else{
+                                    cerr << "Error sending file data: " << strerror(errno) << endl;
+                                    close(filefd);
+                                    break;
                                 }
+                            }else if(ret_send == 0) {
+                                cerr << "Connection closed by peer while sending file data." << endl;
+                                break;
                             }
+                            bytes_sent += ret_send;
                         }
-
                     }
-
                     close(filefd);
                 }
 
