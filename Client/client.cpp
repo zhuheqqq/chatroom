@@ -811,7 +811,9 @@ int ChatWithFriend()
                         cerr<<"Error opening file:"<<strerror(errno)<<endl;
                         return 0;
                     }
-                    ssize_t size=atoi(recv_file.c_str());//文件大小
+                    cout<<recv_file.c_str()<<endl;
+                    ssize_t size=stoll(recv_file.c_str());//文件大小
+                    cout<<size<<endl;
                     char buf[BUFSIZ];//缓冲区
                     ssize_t totalRecvByte=0;
 
@@ -1217,6 +1219,10 @@ void ApplyList(string groupuid)//申请加群列表
         {
             cout<<"您没有该群此操作权限"<<endl;
             return;
+        }else if(recv=="none")
+        {
+            cout<<"您不在该群聊中"<<endl;
+            return;
         }else
         {
             cout<<recv<<endl;
@@ -1451,6 +1457,10 @@ void DissolveGroup(string groupuid)
         {
             cout<<"不好意思,您没有此操作权限"<<endl;
             return;
+        }else if(recv=="none")
+        {
+            cout<<"您不在此群聊中"<<endl;
+            return;
         }else if(recv=="ok")
         {
             system("clear");
@@ -1484,6 +1494,7 @@ void ChatGroup(string groupuid)
     }else if(recv=="no")
     {
         cout<<"您还未加入该群,请先加入该群"<<endl;
+        return;
     }else if(recv=="ok")
     {
         //打印群聊历史聊天记录
