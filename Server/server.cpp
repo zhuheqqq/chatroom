@@ -304,7 +304,7 @@ int main()
                 {
                     // 暂时从 epoll 模型中删除文件描述符
                     //struct epoll_event delEvent;
-                    event.events = EPOLLIN; // 不监听任何事件
+                    event.events = EPOLLIN|EPOLLET; // 不监听任何事件
                     event.data.fd = curfd;
                     epoll_ctl(efd, EPOLL_CTL_DEL, curfd, &event);
 
@@ -312,6 +312,11 @@ int main()
 
                     // 创建新线程处理文件传输
                     std::thread fileThread([&argc_func, curfd, efd]() {
+
+                        // 设置文件描述符为非阻塞模式
+                        int flag = fcntl(curfd, F_GETFL);
+                        flag |= O_NONBLOCK;
+                        fcntl(curfd, F_SETFL, flag);
                         // 处理文件传输操作
                         taskhandler(argc_func);
 
@@ -323,10 +328,10 @@ int main()
                     });
 
                     // 等待线程执行完毕
-                    fileThread.join();
+                    fileThread.detach();
 
                     // 删除动态分配的对象
-                    delete argc_func;
+                    //delete argc_func;
                     
                 }else{
                     // 创建任务并添加到线程池
