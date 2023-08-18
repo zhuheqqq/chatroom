@@ -29,6 +29,8 @@ public:
     string command_string;
 };
 
+
+
 void Sign_up(TcpSocket mysocket,UserCommand command);//注册
 void Log_in(TcpSocket mysocket,UserCommand command);//登陆
 void Log_out(TcpSocket mysocket,UserCommand command);//注销
@@ -300,14 +302,11 @@ int main()
                     //redis.hsetValue("fd-uid表", to_string(curfd), command.m_uid+"(通)");
                 }else if(command.m_flag==SENDFILE||command.m_flag==RECVFILE||command.m_flag==SENDFILEGROUP||command.m_flag==RECVFILEGROUP)
                 {
-                    /*Argc_func argc_func(TcpSocket(curfd),command_string);
-                    taskhandler(&argc_func);*/
                     // 暂时从 epoll 模型中删除文件描述符
-                    // 暂时从 epoll 模型中删除文件描述符
-                    struct epoll_event delEvent;
-                    delEvent.events = 0; // 不监听任何事件
-                    delEvent.data.fd = curfd;
-                    epoll_ctl(efd, EPOLL_CTL_DEL, curfd, &delEvent);
+                    //struct epoll_event delEvent;
+                    event.events = EPOLLIN; // 不监听任何事件
+                    event.data.fd = curfd;
+                    epoll_ctl(efd, EPOLL_CTL_DEL, curfd, &event);
 
                     Argc_func* argc_func = new Argc_func(TcpSocket(curfd), command_string);
 
@@ -334,6 +333,21 @@ int main()
                     Argc_func* argc_func = new Argc_func(TcpSocket(curfd), command_string);
                     Task task(taskhandler, argc_func);
                     pool.addTask(task);
+
+                    // 从 epoll 模型中移除文件描述符
+                    
+                    /*event.data.fd = curfd;
+                    epoll_ctl(efd, EPOLL_CTL_DEL, curfd, &event);
+
+                    // 创建 Argc_func 对象并将其传递给线程池
+                    Argc_func *argc_func = new Argc_func(TcpSocket(curfd), command_string);
+                    Task task(taskhandler, argc_func);
+                    pool.addTask(task);
+
+                    //上符
+                    event.data.fd=mysocket.getfd();
+                    event.events=EPOLLIN|EPOLLET;
+                    epoll_ctl(efd,EPOLL_CTL_ADD,event.data.fd,&event);*/
                 }
                 
             }
@@ -1359,7 +1373,7 @@ void SendFile(TcpSocket mysocket,UserCommand command)
         //memset(buf,0,sizeof(buf));
         //bzero(buf,BUFSIZ);
         ssize_t byteRead=read(mysocket.getfd(),buf,BUFSIZ);//会返回-1
-        //cout<<byteRead<<endl;
+        cout<<byteRead<<endl;
         if (byteRead == -1) {
             if(errno==EAGAIN||errno==EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
             {
