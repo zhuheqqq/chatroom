@@ -1418,8 +1418,11 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
         }
 
         ssize_t bytes_sent = 0;
+        cout<<statbuf.st_size<<endl;
         while (bytes_sent < statbuf.st_size) {
             ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+            cout<<"statbuf:"<<statbuf.st_size<<endl;
+            cout<<"bytes："<<ret_send<<endl;
             if (ret_send == -1) {
                 if (errno == EAGAIN || errno == EWOULDBLOCK) {
                     // 继续尝试发送
@@ -1433,7 +1436,8 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
                 cerr << "Connection closed by peer while sending file data." << endl;
                 break;
             }
-            bytes_sent += ret_send;
+            //bytes_sent += ret_send;
+            cout<<bytes_sent<<endl;
         }
         //mysocket.SendMsg("ok");
     }
@@ -1638,7 +1642,7 @@ void RecvFileGroup(TcpSocket mysocket,UserCommand command)
                         cerr << "Connection closed by peer while sending file data." << endl;
                         break;
                     }
-                    bytes_sent += ret_send;
+                    //bytes_sent += ret_send;
                 }
             }
         }
