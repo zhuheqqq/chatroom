@@ -326,7 +326,7 @@ void Sign_up(TcpSocket mysocket,UserCommand command)//注册选项
 
         random_device rd;
         mt19937 gen(rd()); // 使用 Mersenne Twister 引擎作为随机数生成器
-        uniform_int_distribution<int> dis(0, 99999); // 定义一个均匀分布的随机整数分布
+        uniform_int_distribution<int> dis(0, 100); // 定义一个均匀分布的随机整数分布
 
         string uid = to_string(dis(gen));
         cout << "生成的随机 uid 为：" << uid << endl;
@@ -827,7 +827,7 @@ void CreateGroup(TcpSocket mysocket,UserCommand command)//创建群聊
         //随机数这样好像不太行，写完之后可以换一种生成随机数的方法
         random_device rd;
         mt19937 gen(rd()); // 使用 Mersenne Twister 引擎作为随机数生成器
-        uniform_int_distribution<int> dis(10000000, 99999999); // 定义一个均匀分布的随机整数分布
+        uniform_int_distribution<int> dis(100, 1000); // 定义一个均匀分布的随机整数分布
 
         string groupuid = to_string(dis(gen));
         cout << "生成的随机群 uid 为：" << groupuid << endl;
