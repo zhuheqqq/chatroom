@@ -1411,6 +1411,7 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
         struct stat statbuf;
         fstat(filefd,&statbuf);
         int ret=mysocket.SendMsg(to_string(statbuf.st_size));
+        
         if(ret==0||ret==-1)
         {
             cout<<"已关闭"<<endl;
@@ -1438,6 +1439,7 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
             }
             //bytes_sent += ret_send;
             cout<<bytes_sent<<endl;
+            //cout<<"ret:"<<ret<<endl;
         }
         //mysocket.SendMsg("ok");
     }
@@ -1487,8 +1489,8 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
         fr_socket.SendMsg(L_RED+command.m_uid+"成功接收到您发送的文件"+NONE);
     }
 
-
-    mysocket.SendMsg("ok");
+    cout<<"1"<<endl;
+    //mysocket.SendMsg("ok");
     return;
 
     
@@ -1525,7 +1527,7 @@ void SendFileGroup(TcpSocket mysocket,UserCommand command)
 
     off_t offset=0;
     ssize_t totalRecvByte=0;
-    char buf[4096];
+    char buf[BUFSIZ];
 
     //lseek(filefd, 0, SEEK_SET);  // 将文件描述符位置重置到文件开头
 
@@ -1555,6 +1557,7 @@ void SendFileGroup(TcpSocket mysocket,UserCommand command)
         }
 
         totalRecvByte+=byteWritten;
+        cout<<totalRecvByte<<endl;
     }
 
     close(filefd);
@@ -1622,29 +1625,24 @@ void RecvFileGroup(TcpSocket mysocket,UserCommand command)
             exit(0);
         }
 
-        ret = sendfile(mysocket.getfd(), filefd, NULL, statbuf.st_size);
-        if (ret == -1) {
-            if(errno==EINTR||EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
-            {
-                ssize_t bytes_sent = 0;
-                while (bytes_sent < statbuf.st_size) {
-                    ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
-                    if (ret_send == -1) {
-                        if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
-                            // 继续尝试发送
-                            continue;
-                        } else {
-                            cerr << "Error sending file data: " << strerror(errno) << endl;
-                            close(filefd);
-                            break;
-                        }
-                    } else if (ret_send == 0) {
-                        cerr << "Connection closed by peer while sending file data." << endl;
-                        break;
-                    }
-                    //bytes_sent += ret_send;
+        ssize_t bytes_sent = 0;
+        while (bytes_sent < statbuf.st_size) {
+            ssize_t ret_send = sendfile(mysocket.getfd(), filefd, &bytes_sent, statbuf.st_size - bytes_sent);
+            if (ret_send == -1) {
+                if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+                    // 继续尝试发送
+                    continue;
+                } else {
+                    cerr << "Error sending file data: " << strerror(errno) << endl;
+                    close(filefd);
+                    break;
                 }
+            } else if (ret_send == 0) {
+                cerr << "Connection closed by peer while sending file data." << endl;
+                break;
             }
+            //bytes_sent += ret_send;
+            cout<<bytes_sent<<endl;
         }
         
     }
