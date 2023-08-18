@@ -755,7 +755,7 @@ int ChatWithFriend()
                                 cerr << "Connection closed by peer while sending file data." << endl;
                                 break;
                             }
-                            bytes_sent += ret_send;
+                            //bytes_sent += ret_send;
                         }
                     }
 
@@ -811,14 +811,18 @@ int ChatWithFriend()
                         return 0;
                     }
                     ssize_t size=atoi(recv_file.c_str());//文件大小
-                    char buf[4096];//缓冲区
+                    char buf[BUFSIZ];//缓冲区
                     ssize_t totalRecvByte=0;
+
+                    lseek(filefd,0,SEEK_SET);
 
                     while(size>totalRecvByte)
                     {
-                        ssize_t byteRead=read(mysocket.getfd(),buf,sizeof(buf));//会返回-1
+                        cout<<"size:"<<size<<endl;
+                        //bzero(buf,BUFSIZ);
+                        ssize_t byteRead=read(mysocket.getfd(),buf,BUFSIZ);//会返回-1
                         if (byteRead == -1) {
-                            if(errno == EINTR || errno == EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
+                            if(errno == EAGAIN || errno == EWOULDBLOCK)//对于非阻塞socket返回-1不代表网络真的出错了，应该继续尝试
                             {
                                 continue;
                             }else{
@@ -839,6 +843,7 @@ int ChatWithFriend()
                         }
 
                         totalRecvByte+=byteWritten;
+                        cout<<totalRecvByte<<endl;
                     }
 
                     if (totalRecvByte < size) {
@@ -1580,7 +1585,7 @@ void ChatGroup(string groupuid)
                                 cerr << "Connection closed by peer while sending file data." << endl;
                                 break;
                             }
-                            bytes_sent += ret_send;
+                            //bytes_sent += ret_send;
                         }
                     }
                     close(filefd);
