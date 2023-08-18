@@ -1,6 +1,5 @@
 #include "../Classes/TcpSocket.cpp"
 #include "../Classes/UserCommand.hpp"
-//#include "../Classes/TaskHandler.hpp"
 #include "../Classes/ThreadPool.hpp"
 #include "option.hpp"
 #include "wrap.hpp"
@@ -192,6 +191,7 @@ void taskhandler(void *arg)
 
 int main()
 {
+    signal(SIGPIPE, SIG_IGN);//屏蔽sigpipe信号,防止在与客户端通信时出现的信号导致服务器崩溃或异常退出
 
     int lfd=0,cfd=0,efd=0; 
     char *buf;
@@ -298,11 +298,36 @@ int main()
                 {
                     redis.hsetValue(command.m_uid, "通知套接字", to_string(curfd));
                     //redis.hsetValue("fd-uid表", to_string(curfd), command.m_uid+"(通)");
-                }else if(command.m_flag==SENDFILE||RECVFILE||SENDFILEGROUP||RECVFILEGROUP)
+                }else if(command.m_flag==SENDFILE||command.m_flag==RECVFILE||command.m_flag==SENDFILEGROUP||command.m_flag==RECVFILEGROUP)
                 {
-                    Argc_func argc_func(TcpSocket(curfd),command_string);
-                    taskhandler
-                    (&argc_func);
+                    /*Argc_func argc_func(TcpSocket(curfd),command_string);
+                    taskhandler(&argc_func);*/
+                    // 暂时从 epoll 模型中删除文件描述符
+                    // 暂时从 epoll 模型中删除文件描述符
+                    struct epoll_event delEvent;
+                    delEvent.events = 0; // 不监听任何事件
+                    delEvent.data.fd = curfd;
+                    epoll_ctl(efd, EPOLL_CTL_DEL, curfd, &delEvent);
+
+                    Argc_func* argc_func = new Argc_func(TcpSocket(curfd), command_string);
+
+                    // 创建新线程处理文件传输
+                    std::thread fileThread([&argc_func, curfd, efd]() {
+                        // 处理文件传输操作
+                        taskhandler(argc_func);
+
+                        // 文件传输操作完成后，重新加入 epoll 模型
+                        struct epoll_event addEvent;
+                        addEvent.events = EPOLLIN | EPOLLET;
+                        addEvent.data.fd = curfd;
+                        epoll_ctl(efd, EPOLL_CTL_ADD, curfd, &addEvent);
+                    });
+
+                    // 等待线程执行完毕
+                    fileThread.join();
+
+                    // 删除动态分配的对象
+                    delete argc_func;
                     
                 }else{
                     // 创建任务并添加到线程池
@@ -362,7 +387,7 @@ void Log_in(TcpSocket mysocket,UserCommand command)//登陆选项
     if(!redis.sismember("用户uid集合",command.m_uid)){//帐号不存在返回错误
         mysocket.SendMsg("nonexisent");
     }else{
-        if(onlineUsers.find(command.m_recvuid) != onlineUsers.end())
+        if(onlineUsers.find(command.m_uid) != onlineUsers.end())
         {
             mysocket.SendMsg("handled");//此帐号已经被登录
             return ;
@@ -969,6 +994,7 @@ void DeleteMember(TcpSocket mysocket,UserCommand command)
     if(!redis.hexists(command.m_recvuid+"群成员列表",command.m_uid))
     {
         mysocket.SendMsg("none");
+        return;
     }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)=="群成员")
     {
         mysocket.SendMsg("no");
@@ -976,6 +1002,14 @@ void DeleteMember(TcpSocket mysocket,UserCommand command)
     }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群成员"&&command.m_uid==command.m_option[0])
     {
         mysocket.SendMsg("nono");
+        return;
+    }else if((redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群成员")&&(redis.gethash(command.m_recvuid+"群成员列表",command.m_option[0])=="群主"))
+    {
+        mysocket.SendMsg("no");
+        return;
+    }else if((redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)=="群管理员")&&(redis.gethash(command.m_recvuid+"群成员列表",command.m_option[0])=="群管理员"))
+    {
+        mysocket.SendMsg("no");
         return;
     }
 
@@ -1016,9 +1050,11 @@ void AddManager(TcpSocket mysocket,UserCommand command)//功能暂时好着呢
     }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_uid)!="群主")
     {
         mysocket.SendMsg("no");
+        return;
     }else if(redis.gethash(command.m_recvuid+"群成员列表",command.m_option[0])=="群管理员")
     {
         mysocket.SendMsg("handled");
+        return;
     }
 
     redis.hsetValue(command.m_recvuid+"群成员列表",command.m_option[0],"群管理员");
@@ -1061,6 +1097,11 @@ void DeleteManager(TcpSocket mysocket,UserCommand command)
 
 void DissolveGroup(TcpSocket mysocket,UserCommand command)
 {
+    if(!redis.hexists(command.m_uid+"的群聊列表",command.m_recvuid))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }
     if(redis.gethash(command.m_option[0]+"群成员列表",command.m_uid)!="群主")
     {
         mysocket.SendMsg("no");
@@ -1102,6 +1143,11 @@ void DissolveGroup(TcpSocket mysocket,UserCommand command)
 
 void ApplyList(TcpSocket mysocket,UserCommand command)
 {
+    if(!redis.hexists(command.m_uid+"的群聊列表",command.m_recvuid))
+    {
+        mysocket.SendMsg("none");
+        return;
+    }
     if(redis.gethash(command.m_option[0]+"群成员列表",command.m_uid)!="群成员")
     {
         vector<string> memberlist=redis.getFriendList(command.m_option[0],"的申请加群列表");
@@ -1199,7 +1245,7 @@ void ChatGroup(TcpSocket mysocket,UserCommand command)
     if(!redis.hexists(command.m_uid+"的群聊列表",command.m_recvuid))
     {
         mysocket.SendMsg("no");
-        exit(0);
+        return;
     }
     mysocket.SendMsg("ok");
 
@@ -1445,6 +1491,7 @@ void RecvFile(TcpSocket mysocket,UserCommand command)
     }
 
     close(filefd);
+    cout<<"2"<<endl;
 
     //将新的消息加入消息队列
     string newmsg="我:成功接收到一个文件"+command.m_option[0];
