@@ -9,6 +9,7 @@
 #include "../Classes/TcpSocket.hpp"
 #include "../Classes/UserCommand.hpp"
 #include "../Server/option.hpp"
+#include <termios.h>
  
 extern TcpSocket mysocket;
 UserCommand Curcommand;
@@ -48,6 +49,13 @@ string IP;
 int main(int argc,char **argv)
 {
     //UserCommand Curcommand;
+
+    struct termios term;
+    tcgetattr(0, &term); // 获取终端属性
+
+    term.c_cc[VEOF] = 0; // 禁用 EOF 键
+
+    tcsetattr(0, TCSANOW, &term); // 设置新的终端属性
 
     setup();
 
